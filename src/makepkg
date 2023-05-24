@@ -34,7 +34,7 @@ read_pkgbuild() {
 read_pkgbuild
 
 if [ ${EPOCHON} == "1" ]; then
-  echo ${PKGNAME}_${PKGVER}-${PKGREL}_${ARCH}.deb 
+  echo ${PKGNAME}_${EPOCH}:${PKGVER}-${PKGREL}_${ARCH}.deb 
 else
-  echo ${PKGNAME}_${EPOCH}:${PKGVER}-${PKGREL}_${ARCH}.deb
+  echo ${PKGNAME}_${PKGVER}-${PKGREL}_${ARCH}.deb
 fi
