@@ -13,15 +13,15 @@ read_pkgbuild() {
   PKGNAME=$(grep -oP '(?<=pkgname=).+' PKGBUILD)
   PKGVER=$(grep -oP '(?<=pkgver=).+' PKGBUILD)
   PKGREL=$(grep -oP '(?<=pkgrel=).+' PKGBUILD)
-  EPOCH=$(grep -oP '(?<=epoch=).+' PKGBUILD)
   PKGDESC=$(grep -oP '(?<=pkgdesc=).+' PKGBUILD)
   ARCH=$(grep -oP '(?<=arch=).+' PKGBUILD)
   URL=$(grep -oP '(?<=url=).+' PKGBUILD)
   
-  if [ EPOCH == "" ]; then
-    EPOCHOFF=1
+  if [[ $(grep epoch PKGBUILD|grep -oP '.+(?==)') == "epoch" ]]; then
+    EPOCHON=1
+    EPOCH=$(grep -oP '(?<=epoch=).+' PKGBUILD)
   else
-    EPOCHOFF=0
+    EPOCHON=0
   fi
 
   if [ ${ARCH} == "all" ] || [ ${ARCH} == "('all')" ] || [ ${ARCH} == '("all")' ]; then
@@ -33,7 +33,7 @@ read_pkgbuild() {
 
 read_pkgbuild
 
-if [ EPOCHOFF == 1 ]; then
+if [ ${EPOCHON} == "1" ]; then
   echo ${PKGNAME}_${PKGVER}-${PKGREL}_${ARCH}.deb 
 else
   echo ${PKGNAME}_${EPOCH}:${PKGVER}-${PKGREL}_${ARCH}.deb
