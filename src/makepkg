@@ -6,7 +6,7 @@
 # Copyright (c) 2023 by Hayate Nakamura
 
 NAKO_VERSION="1.0.0-Alpha1"
-srcdir=$(pwd)/pkg
+srcdir=$(pwd)/src
 pkgdir=$(pwd)/pkg
 
 read_pkgbuild() {
