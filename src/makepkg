@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+# Nako: Ports-like system for Debian
+# License: GNU General Public License, version 3 or later
+# Copyright (c) 2023 Radio New Japan Broadcasting Club <njb-fm@via.tokyo.jp>
+# Copyright (c) 2023 by Hayate Nakamura
+
+NAKO_VERSION="1.0.0-Alpha1"
+srcdir=$(pwd)/pkg
+pkgdir=$(pwd)/pkg
+
+read_pkgbuild() {
+  PKGNAME=$(grep -oP '(?<=pkgname=).+' PKGBUILD)
+  PKGVER=$(grep -oP '(?<=pkgver=).+' PKGBUILD)
+  PKGREL=$(grep -oP '(?<=pkgrel=).+' PKGBUILD)
+  EPOCH=$(grep -oP '(?<=epoch=).+' PKGBUILD)
+  PKGDESC=$(grep -oP '(?<=pkgdesc=).+' PKGBUILD)
+  ARCH=$(grep -oP '(?<=arch=).+' PKGBUILD)
+  URL=$(grep -oP '(?<=url=).+' PKGBUILD)
+  
+  if [ EPOCH == "" ]; then
+    EPOCHOFF=1
+  else
+    EPOCHOFF=0
+  fi
+
+  if [ ${ARCH} == "all" ] || [ ${ARCH} == "('all')" ] || [ ${ARCH} == '("all")' ]; then
+    ARCH=all
+  elif [ ${ARCH} == "amd64" ] || [ ${ARCH} == "('amd64')" ] || [ ${ARCH} == '("amd64")' ]; then
+    ARCH=amd64
+  fi
+}
+
+read_pkgbuild
+
+if [ EPOCHOFF == 1 ]; then
+  echo ${PKGNAME}_${PKGVER}-${PKGREL}_${ARCH}.deb 
+else
+  echo ${PKGNAME}_${EPOCH}:${PKGVER}-${PKGREL}_${ARCH}.deb
+fi
