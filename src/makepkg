@@ -8,6 +8,7 @@
 NAKO_VERSION="1.0.0-Alpha1"
 srcdir=$(pwd)/src
 pkgdir=$(pwd)/pkg
+libdir=/usr/lib/nako
 
 read_pkgbuild() {
   PKGNAME=$(grep -oP '(?<=pkgname=).+' PKGBUILD)
@@ -31,10 +32,18 @@ read_pkgbuild() {
   fi
 }
 
+#package() {
+#  ${libdir}/package.sh
+#}
+
 read_pkgbuild
+mkdir ${srcdir}
+mkdir ${pkgdir}
 
 if [ ${EPOCHON} == "1" ]; then
   echo ${PKGNAME}_${EPOCH}:${PKGVER}-${PKGREL}_${ARCH}.deb 
+  # dpkg-deb -Z${compress} -b pkg ${PKGNAME}_${EPOCH}:${PKGVER}-${PKGREL}_${ARCH}.deb
 else
   echo ${PKGNAME}_${PKGVER}-${PKGREL}_${ARCH}.deb
+  # dpkg-deb -Z${compress} -b pkg ${PKGNAME}_${PKGVER}-${PKGREL}_${ARCH}.deb
 fi
