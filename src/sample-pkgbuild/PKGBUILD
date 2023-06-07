@@ -1,0 +1,17 @@
+# Maintainer: Hayate Nakamura <is01.njb at gmail dot com>
+pkgname=nako
+pkgver=0.1
+pkgrel=1
+pkgdesc="A package-build script."
+arch=('all')
+url="https://github.com/njb-fm/nako"
+license=('GPL3')
+depends=('bash')
+source=("git+https://github.com/njb-fm/nako.git")
+md5sums=('SKIP')
+
+package() {
+  cd "${srcdir}/${pkgname}-${pkgver}/"
+  make DESTDIR="$pkgdir" install
+  install -D -m644 LICENSE.md "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE.md"
+}

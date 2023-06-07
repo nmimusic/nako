@@ -8,21 +8,22 @@
 NAKO_VERSION="1.0.0-Alpha1"
 srcdir=$(pwd)/src
 pkgdir=$(pwd)/pkg
-libdir=/usr/lib/nako
 
 read_pkgbuild() {
+  MAINTAINER=$(grep -oP '(?<=# Maintainer:).+' PKGBUILD)
   PKGNAME=$(grep -oP '(?<=pkgname=).+' PKGBUILD)
   PKGVER=$(grep -oP '(?<=pkgver=).+' PKGBUILD)
   PKGREL=$(grep -oP '(?<=pkgrel=).+' PKGBUILD)
   PKGDESC=$(grep -oP '(?<=pkgdesc=).+' PKGBUILD)
   ARCH=$(grep -oP '(?<=arch=).+' PKGBUILD)
   URL=$(grep -oP '(?<=url=).+' PKGBUILD)
-  
+
   if [[ $(grep epoch PKGBUILD|grep -oP '.+(?==)') == "epoch" ]]; then
-    EPOCHON=1
     EPOCH=$(grep -oP '(?<=epoch=).+' PKGBUILD)
+    PKGVERFULL="${EPOCH}:${PKGVER}-${PKGREL}"
   else
     EPOCHON=0
+    PKGVERFULL="${PKGVER}-${PKGREL}"
   fi
 
   if [ ${ARCH} == "all" ] || [ ${ARCH} == "('all')" ] || [ ${ARCH} == '("all")' ]; then
@@ -30,20 +31,36 @@ read_pkgbuild() {
   elif [ ${ARCH} == "amd64" ] || [ ${ARCH} == "('amd64')" ] || [ ${ARCH} == '("amd64")' ]; then
     ARCH=amd64
   fi
+
+  if [[ $(grep section PKGBUILD|grep -oP '.+(?==)') == "section" ]]; then
+    SECTION=$(grep -oP '(?<=section=).+' PKGBUILD)
+  fi
+
+  if [[ $(grep priority PKGBUILD|grep -oP '.+(?==)') == "section" ]]; then
+    PRIORITY=$(grep -oP '(?<=section=).+' PKGBUILD)
+  fi
+
+  # Dependencies
+  #DEPS=
+
+  #BUILDDEPS=
 }
 
-#package() {
-#  ${libdir}/package.sh
-#}
+package() {
+mkdir ${srcdir} ${pkgdir}
+
+mkdir ${pkgdir}/DEBIAN
+echo "Package: ${PKGNAME}" > ${pkgdir}/DEBIAN/control
+echo "Version: ${PKGVERFULL}" >> ${pkgdir}/DEBIAN/control
+echo "Architecture: ${ARCH}" >> ${pkgdir}/DEBIAN/control
+echo "Maintainer: ${MAINTAINER}" >> ${pkgdir}/DEBIAN/control
+echo "Description: ${PKGDESC}" >> ${pkgdir}/DEBIAN/control
+
+
+  echo ${PKGNAME}_${PKGVERFULL}_${ARCH}.deb 
+  # dpkg-deb -Z${compress} -b pkg ${PKGNAME}_${EPOCH}:${PKGVER}-${PKGREL}_${ARCH}.deb
+}
 
 read_pkgbuild
-mkdir ${srcdir}
-mkdir ${pkgdir}
+package
 
-if [ ${EPOCHON} == "1" ]; then
-  echo ${PKGNAME}_${EPOCH}:${PKGVER}-${PKGREL}_${ARCH}.deb 
-  # dpkg-deb -Z${compress} -b pkg ${PKGNAME}_${EPOCH}:${PKGVER}-${PKGREL}_${ARCH}.deb
-else
-  echo ${PKGNAME}_${PKGVER}-${PKGREL}_${ARCH}.deb
-  # dpkg-deb -Z${compress} -b pkg ${PKGNAME}_${PKGVER}-${PKGREL}_${ARCH}.deb
-fi
