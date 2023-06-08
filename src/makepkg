@@ -5,7 +5,7 @@
 # Copyright (c) 2023 Radio New Japan Broadcasting Club <njb-fm@via.tokyo.jp>
 # Copyright (c) 2023 by Hayate Nakamura
 
-NAKO_VERSION="1.0.0-Alpha1"
+NAKO_VERSION="0.1"
 srcdir=$(pwd)/src
 pkgdir=$(pwd)/pkg
 
@@ -22,7 +22,6 @@ read_pkgbuild() {
     EPOCH=$(grep -oP '(?<=epoch=).+' PKGBUILD)
     PKGVERFULL="${EPOCH}:${PKGVER}-${PKGREL}"
   else
-    EPOCHON=0
     PKGVERFULL="${PKGVER}-${PKGREL}"
   fi
 
@@ -33,11 +32,11 @@ read_pkgbuild() {
   fi
 
   if [[ $(grep section PKGBUILD|grep -oP '.+(?==)') == "section" ]]; then
-    SECTION=$(grep -oP '(?<=section=).+' PKGBUILD)
+    PKGSECTION=$(grep -oP '(?<=section=).+' PKGBUILD)
   fi
 
-  if [[ $(grep priority PKGBUILD|grep -oP '.+(?==)') == "section" ]]; then
-    PRIORITY=$(grep -oP '(?<=section=).+' PKGBUILD)
+  if [[ $(grep priority PKGBUILD|grep -oP '.+(?==)') == "priority" ]]; then
+    PKGPRIORITY=$(grep -oP '(?<=priority=).+' PKGBUILD)
   fi
 
   # Dependencies
@@ -47,20 +46,36 @@ read_pkgbuild() {
 }
 
 package() {
-mkdir ${srcdir} ${pkgdir}
+  mkdir ${srcdir} ${pkgdir}
 
-mkdir ${pkgdir}/DEBIAN
-echo "Package: ${PKGNAME}" > ${pkgdir}/DEBIAN/control
-echo "Version: ${PKGVERFULL}" >> ${pkgdir}/DEBIAN/control
-echo "Architecture: ${ARCH}" >> ${pkgdir}/DEBIAN/control
-echo "Maintainer: ${MAINTAINER}" >> ${pkgdir}/DEBIAN/control
-echo "Description: ${PKGDESC}" >> ${pkgdir}/DEBIAN/control
+  mkdir ${pkgdir}/DEBIAN
 
+  echo "Package: ${PKGNAME}" > ${pkgdir}/DEBIAN/control
+  echo "Version: ${PKGVERFULL}" >> ${pkgdir}/DEBIAN/control
+  echo "Architecture: ${ARCH}" >> ${pkgdir}/DEBIAN/control
+  echo "Maintainer: ${MAINTAINER}" >> ${pkgdir}/DEBIAN/control
 
-  echo ${PKGNAME}_${PKGVERFULL}_${ARCH}.deb 
-  # dpkg-deb -Z${compress} -b pkg ${PKGNAME}_${EPOCH}:${PKGVER}-${PKGREL}_${ARCH}.deb
+  if [[ $(grep section PKGBUILD|grep -oP '.+(?==)') == "section" ]]; then
+    echo "Section: ${PKGSECTION}" >> ${pkgdir}/DEBIAN/control
+  fi
+
+  if [[ $(grep priority PKGBUILD|grep -oP '.+(?==)') == "priority" ]]; then
+    echo "Priority: ${PKGPRIORITY}" >> ${pkgdir}/DEBIAN/control
+  fi
+
+  echo "Description: ${PKGDESC}" >> ${pkgdir}/DEBIAN/control
+
+  # Debug Message
+  cat ${pkgdir}/DEBIAN/control
+
+  echo "Creating ${PKGNAME}_${PKGVERFULL}_${ARCH}.deb package..." 
+  # dpkg-deb -Z${compress} -b pkg ${PKGNAME}_${PKGVERFULL}_${ARCH}.deb
 }
 
-read_pkgbuild
-package
+main() {
+  read_pkgbuild
+  package
+}
+
+main
 

@@ -9,6 +9,8 @@ license=('GPL3')
 depends=('bash')
 source=("git+https://github.com/njb-fm/nako.git")
 md5sums=('SKIP')
+section=utility
+priority=optional
 
 package() {
   cd "${srcdir}/${pkgname}-${pkgver}/"
