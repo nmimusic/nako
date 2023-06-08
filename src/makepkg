@@ -9,73 +9,115 @@ NAKO_VERSION="0.1"
 srcdir=$(pwd)/src
 pkgdir=$(pwd)/pkg
 
+usage() {
+	echo "Nako ${NAKO_VERSION}"
+	echo "Copyright (c) 2023 Radio New Japan Broadcasting Club <njb-fm@via.tokyo.jp>"
+	echo
+	echo "usage ${0} [options]"
+	echo
+	echo "Nako options:"
+	echo "     -s | --syncdeps       Install dependencies"
+	echo "     -i | --install        Install created package"
+	echo "     -c | --clean          Clean up work files"
+	echo "     -h | --help           Show this help"
+}
+
 read_pkgbuild() {
-  MAINTAINER=$(grep -oP '(?<=# Maintainer:).+' PKGBUILD)
-  PKGNAME=$(grep -oP '(?<=pkgname=).+' PKGBUILD)
-  PKGVER=$(grep -oP '(?<=pkgver=).+' PKGBUILD)
-  PKGREL=$(grep -oP '(?<=pkgrel=).+' PKGBUILD)
-  PKGDESC=$(grep -oP '(?<=pkgdesc=).+' PKGBUILD)
-  ARCH=$(grep -oP '(?<=arch=).+' PKGBUILD)
-  URL=$(grep -oP '(?<=url=).+' PKGBUILD)
+	MAINTAINER=$(grep -oP '(?<=# Maintainer:).+' PKGBUILD)
+	PKGNAME=$(grep -oP '(?<=pkgname=).+' PKGBUILD)
+	PKGVER=$(grep -oP '(?<=pkgver=).+' PKGBUILD)
+	PKGREL=$(grep -oP '(?<=pkgrel=).+' PKGBUILD)
+	PKGDESC=$(grep -oP '(?<=pkgdesc=").+(?=")' PKGBUILD)
+	ARCH=$(grep -oP '(?<=arch=).+' PKGBUILD)
+	URL=$(grep -oP '(?<=url=).+' PKGBUILD)
 
-  if [[ $(grep epoch PKGBUILD|grep -oP '.+(?==)') == "epoch" ]]; then
-    EPOCH=$(grep -oP '(?<=epoch=).+' PKGBUILD)
-    PKGVERFULL="${EPOCH}:${PKGVER}-${PKGREL}"
-  else
-    PKGVERFULL="${PKGVER}-${PKGREL}"
-  fi
+	if [[ $(grep epoch PKGBUILD|grep -oP '.+(?==)') == "epoch" ]]; then
+		PKGVERFULL="$(grep -oP '(?<=epoch=).+' PKGBUILD):${PKGVER}-${PKGREL}"
+	else
+		PKGVERFULL="${PKGVER}-${PKGREL}"
+	fi
 
-  if [ ${ARCH} == "all" ] || [ ${ARCH} == "('all')" ] || [ ${ARCH} == '("all")' ]; then
-    ARCH=all
-  elif [ ${ARCH} == "amd64" ] || [ ${ARCH} == "('amd64')" ] || [ ${ARCH} == '("amd64")' ]; then
-    ARCH=amd64
-  fi
+	if [ ${ARCH} == "all" ] || [ ${ARCH} == "('all')" ] || [ ${ARCH} == '("all")' ]; then
+		ARCH=all
+	elif [ ${ARCH} == "amd64" ] || [ ${ARCH} == "('amd64')" ] || [ ${ARCH} == '("amd64")' ]; then
+		ARCH=amd64
+	fi
 
-  if [[ $(grep section PKGBUILD|grep -oP '.+(?==)') == "section" ]]; then
-    PKGSECTION=$(grep -oP '(?<=section=).+' PKGBUILD)
-  fi
+	if [[ $(grep section PKGBUILD|grep -oP '.+(?==)') == "section" ]]; then
+		PKGSECTION=$(grep -oP '(?<=section=).+' PKGBUILD)
+	fi
 
-  if [[ $(grep priority PKGBUILD|grep -oP '.+(?==)') == "priority" ]]; then
-    PKGPRIORITY=$(grep -oP '(?<=priority=).+' PKGBUILD)
-  fi
+	if [[ $(grep priority PKGBUILD|grep -oP '.+(?==)') == "priority" ]]; then
+		PKGPRIORITY=$(grep -oP '(?<=priority=).+' PKGBUILD)
+	fi
 
-  # Dependencies
-  #DEPS=
+	# Dependencies
+	#DEPS=
 
-  #BUILDDEPS=
+	#BUILDDEPS=
 }
 
 package() {
-  mkdir ${srcdir} ${pkgdir}
+	mkdir ${srcdir} ${pkgdir}
 
-  mkdir ${pkgdir}/DEBIAN
+	mkdir ${pkgdir}/DEBIAN
 
-  echo "Package: ${PKGNAME}" > ${pkgdir}/DEBIAN/control
-  echo "Version: ${PKGVERFULL}" >> ${pkgdir}/DEBIAN/control
-  echo "Architecture: ${ARCH}" >> ${pkgdir}/DEBIAN/control
-  echo "Maintainer: ${MAINTAINER}" >> ${pkgdir}/DEBIAN/control
+	echo Package: ${PKGNAME} > ${pkgdir}/DEBIAN/control
+	echo Version: ${PKGVERFULL} >> ${pkgdir}/DEBIAN/control
+	echo Architecture: ${ARCH} >> ${pkgdir}/DEBIAN/control
+	echo Maintainer: ${MAINTAINER} >> ${pkgdir}/DEBIAN/control
 
-  if [[ $(grep section PKGBUILD|grep -oP '.+(?==)') == "section" ]]; then
-    echo "Section: ${PKGSECTION}" >> ${pkgdir}/DEBIAN/control
-  fi
+	if [[ $(grep section PKGBUILD|grep -oP '.+(?==)') == "section" ]]; then
+		echo Section: ${PKGSECTION} >> ${pkgdir}/DEBIAN/control
+	fi
 
-  if [[ $(grep priority PKGBUILD|grep -oP '.+(?==)') == "priority" ]]; then
-    echo "Priority: ${PKGPRIORITY}" >> ${pkgdir}/DEBIAN/control
-  fi
+	if [[ $(grep priority PKGBUILD|grep -oP '.+(?==)') == "priority" ]]; then
+		echo Priority: ${PKGPRIORITY} >> ${pkgdir}/DEBIAN/control
+	fi
 
-  echo "Description: ${PKGDESC}" >> ${pkgdir}/DEBIAN/control
+	echo Installed-Size: $(du -k -d0 ${pkgdir}|grep -oP ".+(?=\t${pkgdir})") >> ${pkgdir}/DEBIAN/control
+	echo Description: ${PKGDESC} >> ${pkgdir}/DEBIAN/control
 
-  # Debug Message
-  cat ${pkgdir}/DEBIAN/control
+	echo "Creating ${PKGNAME}_${PKGVERFULL}_${ARCH}.deb package..." 
+	# dpkg-deb -Zxz -b pkg ${PKGNAME}_${PKGVERFULL}_${ARCH}.deb
+}
 
-  echo "Creating ${PKGNAME}_${PKGVERFULL}_${ARCH}.deb package..." 
-  # dpkg-deb -Z${compress} -b pkg ${PKGNAME}_${PKGVERFULL}_${ARCH}.deb
+clean() {
+	echo "Cleaning..."
+	rm -rf ${pkgdir} ${srcdir}
 }
 
 main() {
-  read_pkgbuild
-  package
+	if [ ! -e PKGBUILD ]; then
+		echo "PKGBUILD is missing!!"
+		exit 1
+	fi
+
+	read_pkgbuild
+	package
 }
 
-main
+while (($#>0)); do
+	case $1 in
+		-s | --syncdeps )
+			SYNCDEPS="t"
+			;;
+		-i | --install )
+			INSTALL="t"
+			;;
+		-c | --clean )
+			clean
+			exit 0
+			;;
+		-h )
+			usage
+			exit 0
+			;;
+		* )
+			usage
+			exit 1
+			;;
+	esac
+done
 
+main
