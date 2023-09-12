@@ -25,17 +25,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+set -eu
+
+# Default Settings
 nako_version="0.1"
 nako_name="Nako"
 nako_cmd="nako"
 nako_path="$(dirname $(realpath ${0}))/$(basename ${0})"
 
+# Executables
 pacman_cmd="/usr/bin/pacman"
 pacman_cfg="/etc/pacman.conf"
 pacman_args=()
 
 makepkg_cmd="/usr/bin/makepkg"
-makepkg_cfg="/etc/makepkg"
+makepkg_cfg="/etc/makepkg.conf"
 makepkg_args=()
 
 git_cmd="/usr/bin/git"
@@ -50,5 +54,1236 @@ sudo_args=()
 curl_cmd="/usr/bin/curl"
 curl_args=()
 
+# str options
+arch=
 aur_url="https://aur.archlinux.org/"
+abs_url="https://gitlab.archlinux.org/archlinux/packaging/packages/"
+operation="none"
+
+# int options
+option_y_count=0
+sync_clean_count=0
+
+# boolean options
+bash_debug=false
+debug=false
+force_aur=false
+msgdebug=false
+nocolor=false
+noconfirm=false
+nodeps=false
+nomakepkgconf=false
+sync_search=false
+sync_upgrade=false
+pass_to_pacman=false
+needed=false
+quiet=false
+cleanbuild=none
+redownload=none
+
+# Message configuration
+# msg_common [-n] <label color> <label> <str1> <str2> ...
+msg_common(){
+	[[ "${msgdebug}" = true  ]] && set -xv
+	[[ "${msgdebug}" = false ]] && set +xv
+	local _msg_opts=("-e") _count _message _label
+	_label="$(text -nc "${1}" "${2}")" && shift 2
+	[[ "${1}" = "-n" ]] && _msg_opts+=("-n") && shift 1
+	_message="$(text "${@}")"
+	for _count in $(seq "1" "$(echo -ne "${_message}\n" | wc -l)"); do
+		echo "${_msg_opts[@]}" "$(text -nc cyan "[nako]") ${_label} $(echo -e "${_message}" | head -n "${_count}" | tail -n 1 )"
+	done
+	[[ "${bash_debug}" = true  ]] && set -xv
+	[[ "${bash_debug}" = false ]] && set +xv
+	return 0
+}
+
+# Show the info message
+msg_info() { msg_common green "   Info" "${@}"; }
+
+# Show the Warning message
+msg_warn() { msg_common yellow "Warning" "${@}"; }
+
+# Show the debug message
+msg_debug() { [[ "${debug}" = true ]] && msg_common magenta "  Debug" "${@}"; return 0;}
+
+# Show the ERROR message then exit with status
+msg_error() { msg_common red "  Error" "${@}"; }
+
+# Usage
+text() {
+	local OPTIND OPTARG arg _textcolor _decotypes="" _message _notranslate=false
+	while getopts "c:bnfl" arg; do
+		case "${arg}" in
+			c)
+				case "${OPTARG}" in
+					"black"   ) _textcolor="30" ;;
+					"red"     ) _textcolor="31" ;;
+					"green"   ) _textcolor="32" ;;
+					"yellow"  ) _textcolor="33" ;;
+					"blue"    ) _textcolor="34" ;;
+					"magenta" ) _textcolor="35" ;;
+					"cyan"    ) _textcolor="36" ;;
+					"white"   ) _textcolor="37" ;;
+					*         ) return 1        ;;
+				esac
+				;;
+			b) _decotypes="${_decotypes};1" ;;
+			f) _decotypes="${_decotypes};5" ;;
+			l) _decotypes="${_decotypes};4" ;;
+			*) : ;;
+		esac
+	done
+	shift "$((OPTIND - 1))"
+	_message="${*}"
+	if [[ "${nocolor}" = true ]]; then
+		echo -ne "${@}"
+	else
+		echo -ne "\e[$([[ -v _textcolor ]] && echo -n ";${_textcolor}"; [[ -v _decotypes ]] && echo -n "${_decotypes}")m${_message}\e[m"
+	fi
+}
+
+# Process
+
+# Show message when file is removed
+# remove <file> <file> ...
+remove() {
+	local _file
+	for _file in "${@}"; do msg_debug "Removing ${_file}"; rm -rf "${_file}"; done
+}
+
+usage (){
+	local _pacman_help="${pass_to_pacman}"
+
+	local _nako_usage
+	_nako_usage() {
+		echo "Usage:"
+		echo "${nako_cmd}"
+		echo "${nako_cmd} <operation> [...]"
+		echo
+		echo "operations:"
+		echo "    ${nako_cmd} {-h --help}"
+		echo "    ${nako_cmd} {-A --vote}"
+		echo "    ${nako_cmd} {-V --version}"
+		echo "    ${nako_cmd} {-D --database}    <options> <package(s)>"
+		echo "    ${nako_cmd} {-F --files}       [options] [package(s)]"
+		echo "    ${nako_cmd} {-Q --query}       [options] [package(s)]"
+		echo "    ${nako_cmd} {-R --remove}      [options] <package(s)>"
+		echo "    ${nako_cmd} {-S --sync}        [options] [package(s)]"
+		echo "    ${nako_cmd} {-T --deptest}     [options] [package(s)]"
+		echo "    ${nako_cmd} {-U --upgrade}     [options] <file(s)>"
+		echo
+		echo "new operations:"
+		echo "    ${nako_cmd} {-A --vote}"
+		echo "    ${nako_cmd} {-N --nako}"
+		#echo "    ${nako_cmd} {-P --show}        [options]"
+		#echo "    ${nako_cmd} {-G --getpkgbuild} [package(s)]"
+		echo
+		echo "New options:"
+		echo "       --repo             Assume targets are from the repositories"
+		echo "    -a --aur              Assume targets are from the AUR"
+		echo
+		echo "Permanent configuration options:"
+		echo "    --aururl      <url>   Set an alternative AUR URL"
+		echo "    --makepkg     <file>  makepkg command to use"
+		echo "    --mflags      <flags> Pass arguments to makepkg"
+		echo "    --pacman      <file>  pacman command to use"
+		echo "    --git         <file>  git command to use"
+		echo "    --gitflags    <flags> Pass arguments to git"
+		echo "    --gpg         <file>  gpg command to use"
+		echo "    --gpgflags    <flags> Pass arguments to gpg"
+		echo "    --config      <file>  pacman.conf file to use"
+		echo "    --makepkgconf <file>  makepkg.conf file to use"
+		echo "    --nomakepkgconf       Use the default makepkg.conf"
+		echo
+		echo "nako specific options:"
+		echo "    -c --clean            Remove unneeded dependencies"
+		echo
+	}
+
+	local _nako_usage_sync
+	_nako_usage_sync() {
+		echo "usage:  ${nako_cmd} {-S --sync} [options] [package(s)]"
+		echo "options:"
+		echo "  -b, --dbpath <path>  set an alternate database location"
+		echo "  -c, --clean          remove old packages from cache directory (-cc for all)"
+		echo "  -d, --nodeps         skip dependency version checks (-dd to skip all checks)"
+		echo "  -s, --search <regex> search remote repositories for matching strings"
+		echo "  -u, --sysupgrade     upgrade installed packages (-uu enables downgrades)"
+		echo "  -y, --refresh        download fresh package databases from the server"
+		echo "                       (-yy to force a refresh even if up to date)"
+		echo "      --arch <arch>    set an alternate architecture"
+		echo "      --color <when>   colorize the output"
+		echo "      --config <path>  set an alternate configuration file"
+		echo "      --confirm        always ask for confirmation"
+		echo "      --debug          display debug messages"
+		echo "      --disable-download-timeout"
+		echo "                       use relaxed timeouts for download"
+		echo "      --gpgdir <path>  set an alternate home directory for GnuPG"
+		echo "      --hookdir <dir>  set an alternate hook location"
+		echo "      --ignore <pkg>   ignore a package upgrade (can be used more than once)"
+		echo "      --ignoregroup <grp>"
+		echo "                       ignore a group upgrade (can be used more than once)"
+		echo "      --noconfirm      do not ask for any confirmation"
+	}
+
+	local _nako_usage_remove
+	_nako_usage_remove() {
+		echo "usage:  ${nako_cmd} {-R --remove} [options] <package(s)>"
+		echo "options:"
+		echo "  -b, --dbpath <path>  set an alternate database location"
+		echo "  -d, --nodeps         skip dependency version checks (-dd to skip all checks)"
+		echo "  -u, --unneeded       remove unneeded packages"
+		echo "      --arch <arch>    set an alternate architecture"
+		echo "      --color <when>   colorize the output"
+		echo "      --config <path>  set an alternate configuration file"
+		echo "      --confirm        always ask for confirmation"
+		echo "      --debug          display debug messages"
+		echo "      --disable-download-timeout"
+		echo "                       use relaxed timeouts for download"
+		echo "      --noconfirm      do not ask for any confirmation"
+	}
+
+
+	local _nako_usage_version
+	_nako_usage_version(){ _nako_usage; }
+
+	if [[ "${operation}" = "none" ]]; then
+		_nako_usage
+	elif [[ "${_pacman_help}" = true ]]; then
+		"${pacman_cmd}" -h "--${operation}"
+	elif [[ "$(type -t "_nako_usage_${operation}" )" = "function" ]]; then
+		eval "_nako_usage_${operation}"
+	else
+		case "${operation}" in
+			database | deptest | upgrade | files)
+				"${pacman_cmd}" -h "--${operation}"
+				;;
+			*)
+				msg_error "Help for this operation is not implemented"
+				exit 1
+				;;
+		esac
+	fi
+}
+
+set_operation() {
+	if [[ "${operation}" = "none" ]]; then
+		operation="${1}"
+	elif [[ "${operation}" = "${1}" ]]; then
+		return 0
+	else
+		msg_error "only one operation may be used at a time"
+		exit 1
+	fi
+}
+
+_pacman_conf(){ pacman-conf --config="${pacman_cfg}" "${@}"; }
+
+run_sudo() { (( UID == 0 )) || eval "sudo" "${@}"; return 0 && eval "${@}"; }
+
+run_pacman() { run_sudo "${pacman_cmd}" --config "${pacman_cfg}"  "${@}"; }
+
+nako() { "${nako_path}" "${@}"; }
+
+# Add args to pacman
+# add_args [pacman/makepkg/git/gpg/sudo/curl] <args1> <args2>...
+add_args() {
+	local _target="${1}" _args_array
+	shift 1
+
+	case "${_target}" in
+		"makepkg")
+			makepkg_args+=("${@}")
+			;;
+		"pacman")
+			pacman_args+=("${@}")
+			;;
+		"git")
+			git_args=("${@}")
+			;;
+		"gpg")
+			gpg_args=("${@}")
+			;;
+		"sudo")
+			sudo_args=("${@}")
+			;;
+		"curl") curl_args=("${@}")
+			;;
+		*)
+			msg_error "Failed to set the argument of %s" "${_target}"
+			msg_error "Setting that command is not currently supported"
+			exit 1
+			;;
+	esac
+
+	msg_debug "%s ARGS: %s" "${_target}" "${*}"
+}
+
+# Return 0 if the package specified by the argument is an AUR package
+check_repo_pkg() {
+	pacman -Ssq "${1}" 2>/dev/null | grep -o ".*${1}$" 1> /dev/null 2>&1 && return 0 || return 1;
+}
+
+# Return 0 if the package specified by the argument is already installed
+check_installed_pkg() { "${pacman_cmd}" -Qq "${1}" > /dev/null 2>&1 && return 0 || return 1; }
+
+# Return 0 if the operation passed to this function is in progress.
+check_operation() {
+	[[ "${operation}" = "none" ]] && msg_error "no operation specified (use -h for help)" && return 2
+	[[ ! "${1}" = "${operation}" ]] && { unavailable_in_this_operation ; return 1; }
+	return 0
+}
+
+# Return the directory corresponding to the ~/.cache
+get_cache_dir() {
+	local _user_config_dir _cache_dir
+	if [[ -v XDG_CONFIG_HOME ]]; then
+		_user_config_dir="${XDG_CONFIG_HOME}"
+	else
+		_user_config_dir="${HOME}/.config"
+	fi
+	if [[ -f "${_user_config_dir}/user-dirs.dirs" ]]; then
+		source "${_user_config_dir}/user-dirs.dirs"
+	fi
+	if [[ -v XDG_CACHE_HOME ]]; then
+		_cache_dir="${XDG_CACHE_HOME}"
+	else
+		_cache_dir="${HOME}/.cache"
+	fi
+	echo -n "${_cache_dir}"
+}
+
+# Usage: get_srcinfo_data <path> <var>
+# cf: https://qiita.com/withelmo/items/b0e1ffba639dd3ae18c0
+get_srcinfo_data() {
+	local _srcinfo="${1}" _ver="${2}" _srcinfo_json
+	_srcinfo_json=$(python << EOF
+from srcinfo.parse import parse_srcinfo; import json
+text = """
+$(cat "${1}")
+"""
+parsed, errors = parse_srcinfo(text)
+print(json.dumps(parsed))
+EOF
+)
+	echo "${_srcinfo_json}" | jq -rc "${2}"
+}
+
+get_aur_json() {
+	local _aur_json _resultcount
+	local _pkg="${1}"
+	_aur_json=$("${curl_cmd}" "${curl_args[@]}" -sL "https://aur.archlinux.org/rpc/?v=5&type=search&by=name&arg=${_pkg}" | jq -r)
+	_resultcount="$(echo "${_aur_json}" | jq -r ".resultcount")"
+	if (( "${_resultcount:-"0"}" != 0 )); then
+		echo "${_aur_json}" | jq -r ".results[]"
+	fi
+}
+
+
+# Build and install packages from AUR
+install_aur_pkg() {
+	local _pkg="${1}" _found_pkgs _aur_json _aur_snapshot_url _aur_version _aur_pkgbase
+
+	# Create cache dir
+	if [[ ! -v nako_cache_dir ]]; then
+		nako_cache_dir="$(get_cache_dir)/nako"
+	fi
+	mkdir -p "${nako_cache_dir}/archive"
+	mkdir -p "${nako_cache_dir}/build/${_pkg}"
+
+	# Get value from AurJson
+	msg_info "Searching in AUR ..."
+	_aur_json="$(get_aur_json "${_pkg}")"
+	if [[ -z "${_aur_json}" ]]; then
+		msg_error "Could not find all required packages: %s" "${_pkg}"
+		exit 1
+	fi
+	_found_pkgs="$(echo "${_aur_json}" | jq -r --tab '.Name')"
+	#msg_debug "Found package: $(echo ${_found_pkgs} | tr '\n' ' ')"
+
+	if grep -qx "${_pkg}" <<< "${_found_pkgs}" ; then
+		msg_debug "Select a package %s with an exact name match" "${_pkg}"
+	else
+		msg_error "No package with an exact name match was found"
+		exit 1
+	fi
+
+	# Assign a value from JSON to a variable
+	_aur_json=$(echo "${_aur_json}" | jq -r "select(.Name == \"${_pkg}\")" )
+	_aur_snapshot_url="${aur_url%/}$(echo "${_aur_json}" | jq -r ".URLPath")"
+	_aur_version="$(echo "${_aur_json}" | jq -r ".Version")"
+	_aur_pkgbase="$(echo "${_aur_json}" | jq -r ".PackageBase")"
+
+	# disposal of "--needed"
+	if [[ "${needed}" = true ]]; then
+		if run_pacman -Qq "${_pkg}" 2> /dev/null 1>&2 && \
+			[[ "$(run_pacman -Q "${_pkg}" | cut -d " " -f 2 )" = "${_aur_version}" ]] ;then
+			msg_info "%s is up to date -- skipping" "$(run_pacman -Q "${_pkg}" | tr " " "-")"
+			return 0
+		fi
+	fi
+
+	# Download PKGBUILD
+	msg_info "Download PKGBUILD of %s" "${_pkg}"
+	msg_debug "Get PKGBUILD from %s" "${_aur_snapshot_url}"
+
+	local _pkgbuild_archive_path="${nako_cache_dir}/archive/${_pkg}-${_aur_version}"
+	local _download_pkgbuild=true
+	if [[ -f "${_pkgbuild_archive_path}" ]]; then
+		msg_warn "PKGBUILD has already been downloaded"
+		msg_warn -n "Do you want to overwrite and download? [y/N] :"
+		local _yes_or_no
+		if [[ "${redownload}" = "true" ]] || [[ "${redownload}" = "false" ]]; then
+			_download_pkgbuild="${redownload}"
+		elif [[ "${noconfirm}" = true ]]; then
+			echo
+			_yes_or_no="No"
+		else
+			read -r _yes_or_no
+		fi
+		case "${_yes_or_no}" in
+			"y" | "Y" | "yes" | "Yes" | "YES" )
+				redownload=true
+				;;
+			*)
+				redownload=false
+				;;
+		esac
+	fi
+	if [[ "${_download_pkgbuild}" = true ]]; then
+		remove "${_pkgbuild_archive_path}"
+		"${curl_cmd}" "${curl_args[@]}" -L -C - -f -o "${_pkgbuild_archive_path}" "${_aur_snapshot_url}"
+	fi
+
+	# Extract PKGBUILD
+	msg_info "Unpacking the tarball of PKGBUILD ..."
+	tar -xv -f "${_pkgbuild_archive_path}" -C "${nako_cache_dir}/build/" > /dev/null 2>&1
+
+	# Analyse .SRCINFO
+	local _build_dir="${nako_cache_dir}/build/${_aur_pkgbase}"
+	if [[ ! -f "${_build_dir}/.SRCINFO" ]]; then
+		msg_warn ".SRCINFO was not found.\nGenerating it using makepkg"
+		(
+			cd "${_build_dir}"
+			"${makepkg_cmd}" --printsrcinfo > "${_build_dir}/.SRCINFO"
+		)
+	fi
+
+	local _makedepends _depends _conflicts
+	#_makedepends="$(get_srcinfo_data "${_build_dir}/.SRCINFO" ".makedepends[]?")"
+	#_depends="$(get_srcinfo_data "${_build_dir}/.SRCINFO" ".depends[]?")"
+	readarray -t _depends < <(get_srcinfo_data "${_build_dir}/.SRCINFO" ".depends[]?")
+	readarray -t _makedepends < <(get_srcinfo_data "${_build_dir}/.SRCINFO" ".makedepends[]?")
+	_conflicts="$(get_srcinfo_data "${_build_dir}/.SRCINFO" ".conflicts[]?")"
+	msg_debug "makedepends: %s" "${_makedepends[*]}"
+	msg_debug "depends: %s" "${_depends[*]}"
+	msg_debug "conflicts: %s " "${_conflicts}"
+
+
+	# Check conflicts
+	local _pkg _conflicts_found=false
+	for _pkg in "${_conflicts[@]}" ${_pkg}; do
+		if "${pacman_cmd}" -Qq "${_pkg}" > /dev/null 2>&1 && [[ ! "$("${pacman_cmd}" -Qq "${_pkg}" 2> /dev/null)" = "${_pkg}" ]]; then
+			_conflicts_found=true
+			msg_error "${_pkg} is colliding with $("${pacman_cmd}" -Qq "${_pkg}" 2> /dev/null)"
+		fi
+	done
+	if [[ "${_conflicts_found}" = true ]]; then
+		msg_error "Conflict(s) was found"
+		exit 1
+	fi
+
+
+	# Install dependencies
+	if [[ "${nodeps}" = false ]]; then
+		msg_info "Install dependent packages..."
+		local _force_aur="${force_aur}"
+		force_aur=false
+
+		local __pkg
+	local __install_list=()
+	local __remove_list=()
+
+		# Install missing packages from "depends"
+		for __pkg in "${_depends[@]}"; do
+			if ! check_installed_pkg "${__pkg}"; then
+				__install_list+=("${__pkg}")
+			fi
+		done
+
+		# Install missing packages from "makedepends"
+		for __pkg in "${_makedepends[@]}"; do
+			if ! check_installed_pkg "${__pkg}"; then
+				__install_list+=("${__pkg}")
+
+				# If the package is not included in depends
+				if [[ $(printf '%s\n' "${_depends[@]}" | grep -qx "${__pkg}"; echo -n ${?} ) -eq 0 ]]; then
+					__remove_list+=("${__pkg}")
+				fi
+			fi
+		done
+
+
+		install_pkg "${__install_list[@]}"
+		force_aur="${_force_aur}"
+		unset _force_aur
+	fi
+
+	# Preparation of building
+	# Check srcdir
+	if [[ -d "${_build_dir}/src" ]]; then
+		msg_info "Found %s" "${_build_dir}/src"
+		msg_info -n "Packages to cleanbuild? [y/N] :"
+		local _yes_or_no
+		unset _yes_or_no
+		if [[ "${cleanbuild}" = "true" ]] || [[ "${cleanbuild}" = "false" ]]; then
+			:
+		elif [[ "${noconfirm}" = true ]]; then
+			echo
+			_yes_or_no="No"
+		else
+			read -r _yes_or_no
+		fi
+		case "${_yes_or_no}" in
+			"y" | "Y" | "yes" | "Yes" | "YES" )
+				cleanbuild=true
+				;;
+		esac
+		[[ "${cleanbuild}" = true ]] && add_args makepkg "--clean"
+	fi
+
+
+	# Building
+	add_args "makepkg" "-sf"
+	(
+		cd "${_build_dir}"
+		"${makepkg_cmd}" "${makepkg_args[@]}"
+	)
+
+
+	# Generate post-build package list
+	(
+		cd "${_build_dir}"
+		"${makepkg_cmd}" --printsrcinfo > "${_build_dir}/.SRCINFO"
+	)
+	local _pkgnames _pkgver _pkgrel _arch_array _PKGEXT
+	_pkgver="$(get_srcinfo_data "${_build_dir}/.SRCINFO" ".pkgver" | sed 's/ //g')"
+	_pkgrel="$(get_srcinfo_data "${_build_dir}/.SRCINFO" ".pkgrel" | sed 's/ //g')"
+
+	local _arch _pkgname
+	if [[ "${_arch_array[*]}" = "any" ]]; then
+		_arch="any"
+	else
+		_arch="${arch}"
+	fi
+	_PKGEXT=$(
+		source "${makepkg_cfg}"
+		echo "${PKGEXT}"
+	)
+
+	readarray -t _pkgfilelist < <(
+		cd "${_build_dir}"
+		"${makepkg_cmd}" --packagelist
+	)
+	_pkgfilelist+=("${_build_dir}/${_pkg}-${_pkgver}-${_pkgrel}-${_arch}${_PKGEXT}")
+
+	# Installation
+	local _installed=()
+	for _pkgfile in "${_pkgfilelist[@]}"; do
+		printf "%s\n" "${_installed[@]}" | grep -qx "${_pkgfile}" && continue
+		[[ ! -f "${_pkgfile}" ]] && continue
+		run_pacman "${pacman_args[@]}" -U --noconfirm "${_pkgfile}" && _installed+=("${_pkgfile}")
+	done
+
+	# Remove no-needed packages after build
+	if (( "${#__remove_list[@]}" != 0 )); then
+		run_pacman -R --noconfirm "${__remove_list[*]}"
+	fi
+}
+
+# Search AUR packages
+search_aur_pkg() {
+	local _pkg="${1}" _aur_json
+	_aur_json="$(get_aur_json "${_pkg}")"
+	if [[ -z "${_aur_json}" ]]; then
+		msg_error "Could not find all required packages: %s" "${_pkg}"
+		exit 1
+	fi
+	#local _found_pkgname=($(echo "${_aur_json}" | jq -r ".Name" ))
+	readarray -t _found_pkgname < <(jq -r ".Name" <<< "${_aur_json}")
+
+	if [[ "${quiet}" = true ]]; then
+		local _IFS="${IFS}"
+		IFS=$'\n'
+		echo "${_found_pkgname[*]}"
+		IFS="${_IFS}"
+	else
+		local  _found_pkg __pkgver __popularity __vote __pkgdesc __orphaned __installed __output_text=()
+		for _found_pkg in "${_found_pkgname[@]}"; do
+			__orphaned=false
+			__installed=false
+			_found_json="$(echo "${_aur_json}" | jq "select(.Name == \"${_found_pkg}\")")"
+
+			#echo "${_found_json}"
+			__pkgver="$(echo "${_found_json}" | jq -r ".Version" )"
+			__popularity="$(echo "${_found_json}" | jq -r ".Popularity" )"
+			__vote="$(echo "${_found_json}" | jq -r ".NumVotes" )"
+			__pkgdesc="$(echo "${_found_json}" | jq -r ".Description" )"
+
+			# Rounded to two decimal places of popularity
+			# cf: http://www.rivhiro-weather.com/knowledge/?p=536
+			msg_debug "Raw popularity: %s" "${__popularity}"
+			__popularity="$(printf "%g\n" "${__popularity}" | awk '{printf("%4.2f", $1)}')"
+
+			# Determine that the package is orphaned
+			# cf: https://www.366service.com/jp/qa/7c95f46e5236039134ff5b862ae2cd13
+			if ! echo "${_found_json}" | jq -r --exit-status ".Maintainer" 1> /dev/null 2> /dev/null ; then
+				__orphaned=true
+			fi
+
+			# Determine that the package is Installed
+			if check_installed_pkg "${_found_pkg}"; then
+				__installed=true
+			fi
+
+			__output_text+=(
+				"$(text -n -c blue -b "aur")/$(text -n -b "${_found_pkg}") $(text -n -c cyan "${__pkgver}") (+$(text -n -b "${__vote} ${__popularity}"))"
+			)
+			
+			if [[ "${__orphaned}" = true ]]; then
+				__output_text+=("$(text -bc red "(Orphaned)")")
+			fi
+
+			if [[ "${__installed}" = true ]]; then
+				__output_text+=("$(text -bc cyan "[Installed]")")
+			fi
+			echo "${__output_text[*]}"
+			echo "    ${__pkgdesc}"
+			unset __pkgver __popularity __vote __pkgdesc _found_json __orphaned __installed __output_text
+		done
+	fi
+}
+
+# Show the version
+operation_version() {
+	local _libalpm_version _pacman_version
+
+	# Get libalpm's version from Pyalpm
+	_libalpm_version="$(python3 -c 'import pyalpm; print(pyalpm.alpmversion())')"
+
+	# Get Pacman's version from Pacman
+	_pacman_version="$("${pacman_cmd}" -Q pacman | cut -d ' ' -f 2)"
+
+	echo
+	echo "Nako ${nako_version} - Pacman ${_pacman_version} - libalpm ${_libalpm_version}"
+	echo
+	echo "Nako is a AUR Helper and Pacman wrapper written in Bash and Pyalpm."
+	echo
+	echo "Copyright (C) 2023 Radio New Japan"
+	echo "Copyright (C) 2023 Hayate NAKA-MURA (a.k.a. Jin ASA-NAMI)"
+	echo
+	echo "This programme may be freely redistributed under"
+	echo "the terms of the 3-clause BSD License."
+	echo
+}
+
+operation_remove() {
+	local _pkg _not_found=false
+	for _pkg in "${specified_pkgs[@]}"; do
+		if ! check_installed_pkg "${_pkg}"; then
+			msg_error "target not found: %s" "${_pkg}"
+			_not_found=true
+		fi
+	done
+	if [[ "${_not_found}" = true ]]; then
+		exit 1
+	else
+		run_pacman -R "${pacman_args[@]}" "${specified_pkgs[@]}"
+	fi
+}
+
+# Usage: install_pkg <package1> <package2>...
+install_pkg() {
+	local _pkg _repo_pkgs=() _aur_pkgs=()
+	for _pkg in "${@}"; do
+		[[ -z "${_pkg:-""}" ]] && msg_error "Null characoer was passwd to install_pkg." && exit 1
+		if ! check_installed_pkg "${_pkg}"; then
+			if check_repo_pkg "${_pkg}"; then
+				_repo_pkgs+=("${_pkg}")
+			else
+				_aur_pkgs+=("${_pkg}")
+			fi
+		fi
+	done
+
+	if (( "${#_repo_pkgs[@]}" > 0 )); then
+		run_pacman --asdeps -S "${pacman_args[@]}" "${_repo_pkgs[@]}"
+	fi
+
+	if (( "${#_aur_pkgs[@]}" > 0 )); then
+		unset _pkg
+		for _pkg in "${_aur_pkgs[@]}"; do
+			install_aur_pkg "${_pkg}"
+		done
+	fi
+}
+
+upgrade_aur_pkg() {
+	#msg_error "This is a feature that has not been implemented yet"
+	[[ "${debug}" = false ]] && return 0
+
+	# Search for installed AUR-derived packages
+	msg_info "Searching AUR for updates..."
+	local _aur_json _resultcount _apiurl="${aur_url}/rpc/?v=5&type=info"
+	while read -r _pkg;do
+		_apiurl="${_apiurl}&arg[]=${_pkg}"
+	done < <(run_pacman "${pacman_args[@]}" -Qmq)
+
+	_aur_json=$("${curl_cmd}" "${curl_args[@]}" -sL "${_apiurl}" | jq -r)
+	_resultcount="$(echo "${_aur_json}" | jq -r ".resultcount")"
+	if (( "${_resultcount:-"0"}" != 0 )); then
+		_aur_json="$(echo  "${_aur_json}" | jq -r ".results[]")"
+	else
+		return 0
+	fi
+
+	# Get informations
+	msg_info "Getting information from AUR..."
+	local _aurpkgname _aurpkgremotever _aurpkglocalver
+	readarray -t _aurpkgname	  < <(jq -r .Name <<< "${_aur_json}")
+	readarray -t _aurpkgremotever < <(jq -r .Version <<< "${_aur_json}")
+	readarray -t _aurpkglocalver  < <(
+		printf "%s\0" "${_aurpkgname[@]}" | xargs -0 -I{} pacman -Q {} | cut -d " " -f 2
+	)
+
+	# Compare values
+	local _upgradepkg
+	for (( _count=0; _count<= "${#_aurpkgname[@]}" - 1 ; _count++ )); do
+		#echo "${_aurpkgname[${_count}]}: remote=${_aurpkgremotever[${_count}]} local=${_aurpkglocalver[${_count}]}"
+
+		# vercmp <Remote> <Local>
+		# < 0 => Local is newer than AUR
+		# = 0 => Local is the latest version
+		# > 0 => Local is out of date 
+		_versionStatus="$(vercmp "${_aurpkgremotever[${_count}]}" "${_aurpkglocalver[${_count}]}")"
+
+		(( _versionStatus == 0 )) && continue
+		(( _versionStatus < 0 )) && {
+			#msg_warn "%s: local (%s) is newer than AUR (%s)" "${_aurpkgname[${_count}]}" "${_aurpkglocalver[${_count}]}" "${_aurpkgremotever[${_count}]}"
+			continue
+		}
+		(( _versionStatus > 0 )) && _upgradepkg+=("${_aurpkgname[${_count}]}")
+	done
+	printf "%s\n" "${_upgradepkg[@]}"
+
+	exit 0
+}
+
+operation_sync(){
+	local _pkg
+
+	nako_cache_dir=$(get_cache_dir)/nako
+
+	if [[ ! -d ${nako_cache_dir} ]]; then
+		mkdir -p ${nako_cache_dir}
+	fi
+
+	if [[ -f ${nako_cache_dir}/repopkgs.txt ]]; then
+		rm ${nako_cache_dir}/repopkgs.txt
+	fi
+
+	if (( "${sync_clean_count}" >= 1 )); then
+		remove "$(get_cache_dir)/nako/*"
+		run_pacman -S "${pacman_args[@]}" "-$(yes "c" | head -n "${sync_clean_count}")"
+	fi
+
+	if [[ "${sync_search}" = true ]]; then
+		for _pkg in "${specified_pkgs[@]}"; do
+			search_aur_pkg "${_pkg}"
+		done
+		"${pacman_cmd}" -S "${pacman_args[@]}" "${specified_pkgs[@]}" || true
+	else
+		if [[ "${sync_upgrade}" = true ]]; then
+			upgrade_aur_pkg
+			run_pacman -S "${pacman_args[@]}" --sysupgrade
+		fi
+		for _pkg in "${specified_pkgs[@]}"; do
+			if check_repo_pkg "${_pkg}" && [[ "${force_aur}" = false ]]; then
+				# Export as a list of binary packages
+				echo ${_pkg} >> $(get_cache_dir)/nako/repopkgs.txt
+			else
+				# Install AUR package first
+				install_aur_pkg "${_pkg}"
+				#msg_error "Getting the AUR package has not been implemented yet."
+				#exit 1
+			fi
+		done
+	# Install binary package after
+	run_pacman -S "${pacman_args[@]}" $(cat $(get_cache_dir)/nako/repopkgs.txt)
+	fi
+}
+
+operation_nako() {
+	_no_need_packages="$(${pacman_cmd} -Qtdq)"
+	if [[ ${nako_operation} == "clean_all" ]]; then
+		if [[ ${_no_need_packages} == "" ]]; then
+			exit 0
+		else
+			run_pacman -Rnsc "${_no_need_packages}"
+		fi
+	fi
+}
+
+operation_vote() {
+	# Check aurvote
+	if ! type aurvote 1> /dev/null 2> /dev/null; then
+		msg_error "There is no aurvote"
+		msg_error "Please install with %s" "\"nako -S aurvote\""
+		exit 1
+	fi
+
+	local _pkg _aur_json _found_result_count _pkgver _before_popularity _before_vote
+	for _pkg in "${specified_pkgs[@]}"; do
+
+		# Check that the package exists
+		_aur_json="$(get_aur_json "${_pkg}")"
+		if [[ -z "${_aur_json}" ]]; then
+			msg_error "Could not find all required packages: %s" "${_pkg}"
+			exit 1
+		fi
+		_aur_json=$(echo "${_aur_json}" | jq -r "select(.Name == \"${_pkg}\")")
+
+		# Extract and format a value from json
+		msg_info "Searching in AUR ..."
+		_pkgver="$(echo "${_aur_json}" | jq -r ".Version" )"
+		_before_popularity="$(printf "%g\n" "$(echo "${_aur_json}" | jq -r ".Popularity" )" | awk '{printf("%4.2f", $1)}')"
+		_before_vote="$(echo "${_aur_json}" | jq -r ".NumVotes" )"
+
+		# Voting
+		if [[ "$(aurvote --check "${_pkg}")" = "not voted" ]]; then
+			msg_info "Voted for %s" "${_pkg}"
+			aurvote --vote "${_pkg}" 1> /dev/null
+		else
+			msg_info "Unvoted for %s" "${_pkg}"
+			aurvote --unvote "${_pkg}" 1> /dev/null
+		fi
+
+		# Get post-voting info
+		msg_info "Getting post-voting information ..."
+		_aur_json=$(get_aur_json "${_pkg}" | jq -r "select(.Name == \"${_pkg}\")")
+		_after_popularity="$(printf "%g\n" "$(echo "${_aur_json}" | jq -r ".Popularity" )" | awk '{printf("%4.2f", $1)}')"
+		_after_vote="$(echo "${_aur_json}" | jq -r ".NumVotes" )"
+
+		# Output the result
+		msg_info "%s %s (+%s) -> (+%s)" "$(text -nb "${_pkg}")" "$(text -nc cyan "${_pkgver}")" "$(text -nb "${_before_vote} ${_before_popularity}")" "$(text -nb "${_after_vote} ${_after_popularity}")"
+	done
+}
+
+unavailable_in_this_operation() {
+	msg_error "This option is not available in the current operation"
+	return 1
+}
+
+# Run the operation
+run_operation() {
+	local _operation="${1}"
+	msg_debug "Operation: %s" "${_operation}"
+
+	eval "operation_${_operation}"
+}
+
+# Parse options
+OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "h" "V" "d" "b:" "a" "y" "s" "u" "c" "q" "n" "k" "r:")
+OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "dbpath:" "aururl" "aur" "noconfirm" "config:" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "refresh" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed")
+GETOPT=(-o "$(printf "%s," "${OPTS[@]}")" -l "$(printf "%s," "${OPTL[@]}")" -- "${@}")
+readarray -t PARSED_ARGS < <(getopt "${GETOPT[@]}")
+RAW_ARGS=("${@}")
+
+eval set -- "${PARSED_ARGS[@]}"
+msg_debug "Argument: ${PARSED_ARGS[*]}"
+unset OPTS OPTL
+
+while true; do
+	case "${1}" in
+		-A | --vote)
+			set_operation "vote"
+			pass_to_pacman=false
+			shift 1
+			;;
+		-Q | --query)
+			set_operation "query"
+			pass_to_pacman=false
+			shift 1
+			;;
+		-R | --remove)
+			set_operation "remove"
+			pass_to_pacman=false
+			shift 1
+			;;
+		-S | --sync)
+			set_operation "sync"
+			pass_to_pacman=false
+			shift 1
+			;;
+		-V | --version)
+			set_operation "version"
+			pass_to_pacman=false
+			shift 1
+			;;
+		-D | --database)
+			set_operation "database"
+			pass_to_pacman=true
+			shift 1
+			;;
+		-T | --deptest)
+			set_operation "deptest"
+			pass_to_pacman=true
+			shift 1
+			;;
+		-U | --upgrade)
+			set_operation "upgrade"
+			pass_to_pacman=true
+			shift 1
+			;;
+		-F | --files)
+			set_operation "files"
+			pass_to_pacman=true
+			shift 1
+			;;
+		-N | --nako)
+			set_operation "nako"
+			pass_to_pacman=false
+			shift 1
+			;;
+		--)
+			shift 1
+			break
+			;;
+		*)
+			shift 1
+			;;
+	esac
+done
+
+if [[ "${pass_to_pacman}" = false ]]; then
+	eval set -- "${PARSED_ARGS[@]}"
+	getopt -Q "${GETOPT[@]}" || exit 1
+
+	while true; do
+		case "${1}" in
+			# general short options
+			-a | --aur)
+				force_aur=true
+				shift 1
+				;;
+			-b | --dbpath)
+				add_args pacman "--dbpath '${2}'"
+				shift 2
+				;;
+			-k | --check)
+				add_args pacman "--check"
+				shift 1
+				;;
+			-y | --refresh)
+				option_y_count=$(( option_y_count + 1 ))
+				shift 1
+				;;
+			-n | --nosave)
+				add_args pacman "--nosave"
+				shift 1
+				;;
+			-r | --root)
+				add_args pacman "--root" "${2}"
+				shift 1
+				;;
+			-d | --nodeps)
+				add_args pacman "--nodeps"
+				nodeps=true
+				shift 1
+				;;
+			-h | --help)
+				usage
+				exit 0
+				;;
+
+			# general long options
+			--asdeps)
+				add_args pacman "--asdeps"
+				shift 1
+				;;
+			--asexplicit)
+				add_args pacman "--asexplicit"
+				shift 1
+				;;
+			--arch)
+				add_args pacman "--arch ${2}"
+				arch="${2}"
+				shift 2
+				;;
+			--aururl)
+				aur_url="${2}"
+				shift 2
+				;;
+			--bash-debug)
+				bash_debug=true
+				set -xv
+				shift 1
+				;;
+			--clean)
+				case ${operation} in
+					"sync")
+						sync_clean_count=$(( sync_clean_count + 1 ))
+						;;
+					"nako")
+						nako_operation="clean_all"
+						;;
+				esac
+				shift 1
+				;;
+			--cascade)
+				add_args pacman "--cascade"
+				shift 1
+				;;
+			--cachedir)
+				add_args pacman "--cachedir" "${2}"
+				shift 2
+				;;
+			--curl)
+				curl_cmd="${2}"
+				shift 2
+				;;
+			--curlflags)
+				add_args curl "${2}"
+				shift 2
+				;;
+			--confirm)
+				noconfirm=false
+				shift 1
+				;;
+			--config)
+				pacman_cfg="${2}" && add_args pacman "--config ${2}"
+				shift 2
+				;;
+			--debug)
+				debug=true
+				add_args pacman "--debug"
+				shift 1
+				;;
+			--gpgdir)
+				add_args pacman "--gpgdir ${2}"
+				shift 2
+				;;
+			--git)
+				git_cmd="${2}"
+				shift 2
+				;;
+			--gitflags)
+				add_args git "${2}"
+				shift 2
+				;;
+			--hookdir)
+				add_args pacman "--hookdir ${2}"
+				shift 2
+				;;
+			--ignoregroup)
+				add_args pacman "--ignoregroup ${2}"
+				shift 2
+				;;
+			--ignore)
+				add_args pacman "--ignore ${2}"
+				shift 2
+				;;
+			--makepkg)
+				makepkg_cmd="${2}"
+				shift 2
+				;;
+			--mflags)
+				add_args makepkg "${2}"
+				shift 2
+				;;
+			--msg-debug)
+				msgdebug=true
+				shift 1
+				;;
+			--noconfirm)
+				add_args pacman "--noconfirm"
+				noconfirm=true
+				shift 1
+				;;
+			--nocolor)
+				add_args pacman "--color never"
+				nocolor=true
+				shift 1
+				;;
+			--needed)
+				add_args pacman "--needed"
+				needed=true
+				shift 1
+				;;
+			--pacman)
+				pacman_cmd="${2}"
+				shift 2
+				;;
+			--recursive)
+				add_args pacman "--recursive"
+				shift 1
+				;;
+			--search)
+				sync_search=true
+				shift 1
+				;;
+			--sysupgrade)
+				sync_upgrade=true
+				shift 1
+				;;
+			--unneeded)
+				add_args pacman "--unneeded"
+				shift 1
+				;;
+			--nako-debug)
+				debug=true
+				shift 1
+				;;
+
+			# Other long options
+			--color)
+				case "${2}" in
+					"never")
+						nocolor=true
+						add_args pacman "--color never"
+						;;
+					"always")
+						nocolor=false
+						add_args pacman "--color always"
+						;;
+					"auto")
+						msg_error "auto is not currently supported."
+						add_args pacman "--color auto"
+						;;
+				esac
+				shift 2
+				;;
+			--disable-download-timeout)
+				add_args curl "--max-time 0"
+				add_args pacman "--disable-download-timeout"
+				shift 1
+				;;
+			--makepkgconfig)
+				if [[ "${nomakepkgconf}" = false ]]; then
+					makepkg_cfg="${2}"
+				else
+					msg_warn "--nomakepkgconf is specified.\n--makepkgconf has been ignored."
+				fi
+				shift 2
+				;;
+			--nomakepkgconf)
+				makepkg_cfg="/etc/makepkg.conf"
+				nomakepkgconf=true
+				shift 1
+				;;
+			--puella)
+				text -flb "Please make a contract with me and become a Puella Magi !"
+				echo
+				shift 1
+				exit 0
+				;;
+
+			# Other short options
+			-s)
+				case "${operation}" in
+					"sync")
+						add_args pacman "--search"
+						sync_search=true
+						;;
+					"remove")
+						add_args pacman "--recursive"
+						;;
+					*)
+						unavailable_in_this_operation
+						;;
+				esac
+				shift 1
+				;;
+			-u)
+				case "${operation}" in
+					"sync") 
+						sync_upgrade=true;;
+					"remove")
+						add_args pacman "--unneeded"
+						;;
+					"none")
+						:
+						;;
+					*)
+						unavailable_in_this_operation
+						;;
+				esac
+				shift 1
+				;;
+			-c)
+				case "${operation}" in
+					"sync")
+						sync_clean_count=$(( sync_clean_count + 1 ))
+						;;
+					"remove")
+						add_args pacman "--cascade"
+						;;
+					"nako")
+						nako_operation="clean_all"
+						;;
+					*)
+						unavailable_in_this_operation
+						;;
+				esac
+				shift 1
+				;;
+
+			#-- for getopt --#
+			--)
+				shift 1
+				break
+				;;
+			* )
+				shift 1
+				;;
+		esac
+	done
+
+	specified_pkgs=("${@}")
+fi
+
+# Get architecture fron pacman.conf
+[[ -z "${arch-""}" ]] && arch="$(_pacman_conf Architecture)"
+
+# Show message
+[[ "${force_aur}" = true ]] && msg_debug "Assume targets are from the AUR"
+
+
+if [[ "${pass_to_pacman}" = false ]]; then
+	# Run database update
+	if (( "${option_y_count}" == 1 )); then
+		run_pacman "${pacman_args[@]}" -Sy
+	elif (( "${option_y_count}" >= 2 )); then
+		run_pacman "${pacman_args[@]}" -Syy
+	fi
+fi
+
+# Execute the operation set by "set_operation"
+case "${operation}" in
+	"version" | "sync" | "remove" | "vote" | "nako")
+		run_operation "${operation}"
+		;;
+	"database" | "deptest" | "upgrade" | "files")
+		run_pacman "${RAW_ARGS[@]}"
+		;;
+	"none")
+		msg_error "no operation specified (use -h for help)"
+		exit 1
+		;;
+	*)
+		msg_error "Undefined operation"
+		exit 1
+		;;
+esac
 
