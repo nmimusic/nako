@@ -28,7 +28,7 @@
 set -eu
 
 # Default Settings
-nako_version="0.1"
+nako_version="0.8"
 nako_name="Nako"
 nako_cmd="nako"
 nako_path="$(dirname $(realpath ${0}))/$(basename ${0})"
@@ -74,11 +74,13 @@ nocolor=false
 noconfirm=false
 nodeps=false
 nomakepkgconf=false
-sync_search=false
+pkg_search=false
+pkg_list=false
 sync_upgrade=false
 pass_to_pacman=false
 needed=false
 quiet=false
+downloadonly=false
 cleanbuild=none
 redownload=none
 
@@ -210,8 +212,10 @@ usage (){
 		echo "  -c, --clean          remove old packages from cache directory (-cc for all)"
 		echo "  -d, --nodeps         skip dependency version checks (-dd to skip all checks)"
 		echo "  -i, --info           view package information (-ii for extended information)"
+		echo "  -q, --quiet          show less information for query and search"
 		echo "  -s, --search <regex> search remote repositories for matching strings"
 		echo "  -u, --sysupgrade     upgrade installed packages (-uu enables downgrades)"
+		echo "  -w, --downloadonly   download packages but do not install/upgrade anything"
 		echo "  -y, --refresh        download fresh package databases from the server"
 		echo "                       (-yy to force a refresh even if up to date)"
 		echo "      --arch <arch>    set an alternate architecture"
@@ -226,6 +230,33 @@ usage (){
 		echo "      --ignore <pkg>   ignore a package upgrade (can be used more than once)"
 		echo "      --ignoregroup <grp>"
 		echo "                       ignore a group upgrade (can be used more than once)"
+		echo "      --noconfirm      do not ask for any confirmation"
+	}
+
+	local _nako_usage_query
+	_nako_usage_query() {
+		echo "usage:  ${nako_cmd} {-Q --query} [options] [package(s)]"
+		echo "options:"
+		echo "  -b, --dbpath <path>  set an alternate database location"
+		echo "  -c, --changelog      view the changelog of a package"
+		echo "  -d, --deps           list packages installed as dependencies [filter]"
+		echo "  -i, --info           view package information (-ii for extended information)"
+		echo "  -s, --search <regex> search locally-installed packages for matching strings"
+		echo "  -q, --quiet          show less information for query and search"
+		echo "  -t, --unrequired     list packages not (optionally) required by any"
+		echo "                       package (-tt to ignore optdepends) [filter]"
+		echo "  -u, --upgrades       list outdated packages [filter]"
+		echo "  -v, --verbose        be verbose"
+		echo "      --arch <arch>    set an alternate architecture"
+		echo "      --color <when>   colorize the output"
+		echo "      --config <path>  set an alternate configuration file"
+		echo "      --confirm        always ask for confirmation"
+		echo "      --debug          display debug messages"
+		echo "      --disable-download-timeout"
+		echo "                       use relaxed timeouts for download"
+		echo "      --gpgdir <path>  set an alternate home directory for GnuPG"
+		echo "      --hookdir <dir>  set an alternate hook location"
+		echo "      --logfile <path> set an alternate log file"
 		echo "      --noconfirm      do not ask for any confirmation"
 	}
 
@@ -592,11 +623,16 @@ install_aur_pkg() {
 
 	# Installation
 	local _installed=()
-	for _pkgfile in "${_pkgfilelist[@]}"; do
-		printf "%s\n" "${_installed[@]}" | grep -qx "${_pkgfile}" && continue
-		[[ ! -f "${_pkgfile}" ]] && continue
-		run_pacman "${pacman_args[@]}" -U --noconfirm "${_pkgfile}" && _installed+=("${_pkgfile}")
-	done
+
+	if [[ "${downloadonly}" = "true" ]]; then
+		:
+	else
+		for _pkgfile in "${_pkgfilelist[@]}"; do
+			printf "%s\n" "${_installed[@]}" | grep -qx "${_pkgfile}" && continue
+			[[ ! -f "${_pkgfile}" ]] && continue
+			run_pacman "${pacman_args[@]}" -U --noconfirm "${_pkgfile}" && _installed+=("${_pkgfile}")
+		done
+	fi
 
 	# Remove no-needed packages after build
 	if (( "${#__remove_list[@]}" != 0 )); then
@@ -796,15 +832,22 @@ operation_sync(){
 	fi
 
 	if (( "${sync_clean_count}" >= 1 )); then
-		remove "$(get_cache_dir)/nako/*"
-		run_pacman -S "${pacman_args[@]}" "-$(yes "c" | head -n "${sync_clean_count}" | sed -z "s/\n//g")"
+		if [[ "${force_aur}" = false ]]; then
+			run_pacman -S "${pacman_args[@]}" "-$(yes "c" | head -n "${sync_clean_count}" | sed -z "s/\n//g")"
+		fi
+		msg_info "Removing all other AUR packages from cache..."
+		rm -rf "${nako_cache_dir}/archive"
+		rm -rf "${nako_cache_dir}/build"
+		rm -rf "${nako_cache_dir}/*"
 	fi
 
-	if [[ "${sync_search}" = true ]]; then
+	if [[ "${pkg_search}" = true ]]; then
 		for _pkg in "${specified_pkgs[@]}"; do
 			search_aur_pkg "${_pkg}"
 		done
 		"${pacman_cmd}" -S "${pacman_args[@]}" "${specified_pkgs[@]}" || true
+	elif [[ "${pkg_list}" = "true" ]]; then
+		"${pacman_cmd}" -S "${pacman_args[@]}" "${specified_pkgs[@]}"
 	elif (( "${option_i_count}" >= 1 )); then
 		if [[ "${specified_pkgs[@]}" == "" ]]; then
 			"${pacman_cmd}" -S "${pacman_args[@]}" "-$(yes "i" | head -n "${option_i_count}" | sed -z "s/\n//g")"
@@ -829,12 +872,24 @@ operation_sync(){
 			else
 				# Install AUR package first
 				install_aur_pkg "${_pkg}"
-				#msg_error "Getting the AUR package has not been implemented yet."
-				#exit 1
 			fi
 			# Install binary package after
-			run_pacman -S "${pacman_args[@]}" $(cat $(get_cache_dir)/nako/repopkgs.txt)
+			if [[ -f ${nako_cache_dir}/repopkgs.txt ]]; then
+				run_pacman -S "${pacman_args[@]}" $(cat $(get_cache_dir)/nako/repopkgs.txt)
+			fi
 			done
+	fi
+}
+
+operation_query(){
+	if [[ "${pkg_search}" = true ]]; then
+		"${pacman_cmd}" -Q "${pacman_args[@]}" "${specified_pkgs[@]}"
+	elif [[ "${pkg_list}" = "true" ]]; then
+		"${pacman_cmd}" -Q "${pacman_args[@]}" "${specified_pkgs[@]}"
+	elif (( "${option_i_count}" >= 1 )); then
+		"${pacman_cmd}" -Q "${pacman_args[@]}" "-$(yes "i" | head -n "${option_i_count}" | sed -z "s/\n//g")" "${specified_pkgs[@]}"
+	else
+		"${pacman_cmd}" -Q "${pacman_args[@]}" "${specified_pkgs[@]}"
 	fi
 }
 
@@ -908,8 +963,8 @@ run_operation() {
 }
 
 # Parse options
-OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "h" "V" "d" "b:" "a" "y" "s" "u" "i" "c" "q" "n" "k" "r:")
-OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "dbpath:" "aururl" "aur" "noconfirm" "info" "config:" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "refresh" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed")
+OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "h" "V" "d" "b:" "a" "y" "s" "u" "i" "c" "q" "n" "k" "r:" "l" "t" "w" "q")
+OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "dbpath:" "aururl" "aur" "noconfirm" "info" "config:" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "deps" "list" "refresh" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed" "unrequired" "downloadonly" "quiet")
 GETOPT=(-o "$(printf "%s," "${OPTS[@]}")" -l "$(printf "%s," "${OPTL[@]}")" -- "${@}")
 readarray -t PARSED_ARGS < <(getopt "${GETOPT[@]}")
 RAW_ARGS=("${@}")
@@ -1015,9 +1070,23 @@ if [[ "${pass_to_pacman}" = false ]]; then
 				add_args pacman "--root" "${2}"
 				shift 1
 				;;
-			-d | --nodeps)
-				add_args pacman "--nodeps"
-				nodeps=true
+			-l | --list)
+				pkg_list=true
+				add_args pacman "--list" "${2}"
+				shift 1
+				;;
+			-t | --unrequired)
+				add_args pacman "--unrequired"
+				shift 1
+				;;
+			-w | --downloadonly)
+				add_args pacman "--downloadonly"
+				downloadonly=true
+				shift 1
+				;;
+			-q | --quiet)
+				add_args pacman "--quiet"
+				quiet=true
 				shift 1
 				;;
 			-h | --help)
@@ -1083,6 +1152,10 @@ if [[ "${pass_to_pacman}" = false ]]; then
 				pacman_cfg="${2}" && add_args pacman "--config ${2}"
 				shift 2
 				;;
+			--deps)
+				add_args pacman "--deps"
+				shift 1
+				;;
 			--debug)
 				debug=true
 				add_args pacman "--debug"
@@ -1134,6 +1207,11 @@ if [[ "${pass_to_pacman}" = false ]]; then
 				nocolor=true
 				shift 1
 				;;
+			--nodeps)
+				add_args pacman "--nodeps"
+				nodeps=true
+				shift 1
+				;;
 			--needed)
 				add_args pacman "--needed"
 				needed=true
@@ -1148,7 +1226,7 @@ if [[ "${pass_to_pacman}" = false ]]; then
 				shift 1
 				;;
 			--search)
-				sync_search=true
+				_search=true
 				shift 1
 				;;
 			--sysupgrade)
@@ -1210,9 +1288,9 @@ if [[ "${pass_to_pacman}" = false ]]; then
 			# Other short options
 			-s)
 				case "${operation}" in
-					"sync")
+					"sync" | "query")
 						add_args pacman "--search"
-						sync_search=true
+						pkg_search=true
 						;;
 					"remove")
 						add_args pacman "--recursive"
@@ -1226,7 +1304,8 @@ if [[ "${pass_to_pacman}" = false ]]; then
 			-u)
 				case "${operation}" in
 					"sync") 
-						sync_upgrade=true;;
+						sync_upgrade=true
+						;;
 					"remove")
 						add_args pacman "--unneeded"
 						;;
@@ -1252,6 +1331,18 @@ if [[ "${pass_to_pacman}" = false ]]; then
 						;;
 					*)
 						unavailable_in_this_operation
+						;;
+				esac
+				shift 1
+				;;
+			-d)
+				case "${operation}" in
+					"query")
+						add_args pacman "--deps"
+						;;
+					*)
+						add_args pacman "--nodeps"
+						nodeps=true
 						;;
 				esac
 				shift 1
@@ -1289,7 +1380,7 @@ fi
 
 # Execute the operation set by "set_operation"
 case "${operation}" in
-	"version" | "sync" | "remove" | "vote" | "nako")
+	"version" | "sync" | "query" | "remove" | "vote" | "nako")
 		run_operation "${operation}"
 		;;
 	"database" | "deptest" | "upgrade" | "files")
