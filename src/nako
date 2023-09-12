@@ -61,6 +61,7 @@ abs_url="https://gitlab.archlinux.org/archlinux/packaging/packages/"
 operation="none"
 
 # int options
+option_i_count=0
 option_y_count=0
 sync_clean_count=0
 
@@ -208,6 +209,7 @@ usage (){
 		echo "  -b, --dbpath <path>  set an alternate database location"
 		echo "  -c, --clean          remove old packages from cache directory (-cc for all)"
 		echo "  -d, --nodeps         skip dependency version checks (-dd to skip all checks)"
+		echo "  -i, --info           view package information (-ii for extended information)"
 		echo "  -s, --search <regex> search remote repositories for matching strings"
 		echo "  -u, --sysupgrade     upgrade installed packages (-uu enables downgrades)"
 		echo "  -y, --refresh        download fresh package databases from the server"
@@ -795,7 +797,7 @@ operation_sync(){
 
 	if (( "${sync_clean_count}" >= 1 )); then
 		remove "$(get_cache_dir)/nako/*"
-		run_pacman -S "${pacman_args[@]}" "-$(yes "c" | head -n "${sync_clean_count}")"
+		run_pacman -S "${pacman_args[@]}" "-$(yes "c" | head -n "${sync_clean_count}" | sed -z "s/\n//g")"
 	fi
 
 	if [[ "${sync_search}" = true ]]; then
@@ -803,6 +805,18 @@ operation_sync(){
 			search_aur_pkg "${_pkg}"
 		done
 		"${pacman_cmd}" -S "${pacman_args[@]}" "${specified_pkgs[@]}" || true
+	elif (( "${option_i_count}" >= 1 )); then
+		if [[ "${specified_pkgs[@]}" == "" ]]; then
+			"${pacman_cmd}" -S "${pacman_args[@]}" "-$(yes "i" | head -n "${option_i_count}" | sed -z "s/\n//g")"
+		else
+			for _pkg in "${specified_pkgs[@]}"; do
+				if check_repo_pkg "${_pkg}" && [[ "${force_aur}" = false ]]; then
+					"${pacman_cmd}" -S "${pacman_args[@]}" "-$(yes "i" | head -n "${option_i_count}" | sed -z "s/\n//g")" "${specified_pkgs[@]}"
+				else
+					msg_info "Show the AUR package info has not been implemented yet."
+				fi
+			done
+		fi
 	else
 		if [[ "${sync_upgrade}" = true ]]; then
 			upgrade_aur_pkg
@@ -818,9 +832,9 @@ operation_sync(){
 				#msg_error "Getting the AUR package has not been implemented yet."
 				#exit 1
 			fi
-		done
-	# Install binary package after
-	run_pacman -S "${pacman_args[@]}" $(cat $(get_cache_dir)/nako/repopkgs.txt)
+			# Install binary package after
+			run_pacman -S "${pacman_args[@]}" $(cat $(get_cache_dir)/nako/repopkgs.txt)
+			done
 	fi
 }
 
@@ -894,8 +908,8 @@ run_operation() {
 }
 
 # Parse options
-OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "h" "V" "d" "b:" "a" "y" "s" "u" "c" "q" "n" "k" "r:")
-OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "dbpath:" "aururl" "aur" "noconfirm" "config:" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "refresh" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed")
+OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "h" "V" "d" "b:" "a" "y" "s" "u" "i" "c" "q" "n" "k" "r:")
+OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "dbpath:" "aururl" "aur" "noconfirm" "info" "config:" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "refresh" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed")
 GETOPT=(-o "$(printf "%s," "${OPTS[@]}")" -l "$(printf "%s," "${OPTL[@]}")" -- "${@}")
 readarray -t PARSED_ARGS < <(getopt "${GETOPT[@]}")
 RAW_ARGS=("${@}")
@@ -980,6 +994,10 @@ if [[ "${pass_to_pacman}" = false ]]; then
 			-b | --dbpath)
 				add_args pacman "--dbpath '${2}'"
 				shift 2
+				;;
+			-i | --info)
+				option_i_count=$(( option_i_count + 1 ))
+				shift 1
 				;;
 			-k | --check)
 				add_args pacman "--check"
