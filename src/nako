@@ -28,7 +28,7 @@
 set -eu
 
 # Default Settings
-nako_version="0.8"
+nako_version="0.8.1"
 nako_name="Nako"
 nako_cmd="nako"
 nako_path="$(dirname $(realpath ${0}))/$(basename ${0})"
@@ -167,7 +167,6 @@ usage (){
 		echo
 		echo "operations:"
 		echo "    ${nako_cmd} {-h --help}"
-		echo "    ${nako_cmd} {-A --vote}"
 		echo "    ${nako_cmd} {-V --version}"
 		echo "    ${nako_cmd} {-D --database}    <options> <package(s)>"
 		echo "    ${nako_cmd} {-F --files}       [options] [package(s)]"
