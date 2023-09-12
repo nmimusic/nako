@@ -12,8 +12,8 @@ install:
 	mkdir -p $(DESTDIR)$(LICENSEDIR)
 	install -Dm755 src/nako $(DESTDIR)$(BINDIR)/nako
 	install -Dm755 README.md $(DESTDIR)$(DOCDIR)/readme.md
-	install -Dm755 README_ja.md $(DESTDIR)$(DOCDIR)/nako
-	install -Dm755 LICENSE $(DESTDIR)$(LICENSEDIR)/nako
+	install -Dm755 README_ja.md $(DESTDIR)$(DOCDIR)/readme_ja.md
+	install -Dm755 LICENSE $(DESTDIR)$(LICENSEDIR)/LICENSE
 
 uninstall:
 	rm -rf $(DESTDIR)$(BINDIR)/nako
