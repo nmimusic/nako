@@ -63,6 +63,7 @@ operation="none"
 # int options
 option_i_count=0
 option_y_count=0
+option_g_count=0
 sync_clean_count=0
 
 # boolean options
@@ -211,6 +212,8 @@ usage (){
 		echo "  -b, --dbpath <path>  set an alternate database location"
 		echo "  -c, --clean          remove old packages from cache directory (-cc for all)"
 		echo "  -d, --nodeps         skip dependency version checks (-dd to skip all checks)"
+		echo "  -g, --groups         view all members of a package group"
+		echo "                       (-gg to view all groups and members)"
 		echo "  -i, --info           view package information (-ii for extended information)"
 		echo "  -q, --quiet          show less information for query and search"
 		echo "  -s, --search <regex> search remote repositories for matching strings"
@@ -240,6 +243,8 @@ usage (){
 		echo "  -b, --dbpath <path>  set an alternate database location"
 		echo "  -c, --changelog      view the changelog of a package"
 		echo "  -d, --deps           list packages installed as dependencies [filter]"
+		echo "  -e, --explicit       list packages explicitly installed [filter]"
+		echo "  -g, --groups         view all members of a package group"
 		echo "  -i, --info           view package information (-ii for extended information)"
 		echo "  -s, --search <regex> search locally-installed packages for matching strings"
 		echo "  -q, --quiet          show less information for query and search"
@@ -856,10 +861,12 @@ operation_sync(){
 				if check_repo_pkg "${_pkg}" && [[ "${force_aur}" = false ]]; then
 					"${pacman_cmd}" -S "${pacman_args[@]}" "-$(yes "i" | head -n "${option_i_count}" | sed -z "s/\n//g")" "${specified_pkgs[@]}"
 				else
-					msg_info "Show the AUR package info has not been implemented yet."
+					msg_info "Showing the AUR package info has not been implemented yet."
 				fi
 			done
 		fi
+	elif (( "${option_g_count}" >= 1 )); then
+		"${pacman_cmd}" -S "${pacman_args[@]}" "-$(yes "g" | head -n "${option_g_count}" | sed -z "s/\n//g")" "${specified_pkgs[@]}"
 	else
 		if [[ "${sync_upgrade}" = true ]]; then
 			upgrade_aur_pkg
@@ -888,6 +895,8 @@ operation_query(){
 		"${pacman_cmd}" -Q "${pacman_args[@]}" "${specified_pkgs[@]}"
 	elif (( "${option_i_count}" >= 1 )); then
 		"${pacman_cmd}" -Q "${pacman_args[@]}" "-$(yes "i" | head -n "${option_i_count}" | sed -z "s/\n//g")" "${specified_pkgs[@]}"
+	elif (( "${option_g_count}" >= 1 )); then
+		"${pacman_cmd}" -Q "${pacman_args[@]}" "-$(yes "g" | head -n "${option_g_count}" | sed -z "s/\n//g")" "${specified_pkgs[@]}"
 	else
 		"${pacman_cmd}" -Q "${pacman_args[@]}" "${specified_pkgs[@]}"
 	fi
@@ -963,8 +972,8 @@ run_operation() {
 }
 
 # Parse options
-OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "h" "V" "d" "b:" "a" "y" "s" "u" "i" "c" "q" "n" "k" "r:" "l" "t" "w" "q")
-OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "dbpath:" "aururl" "aur" "noconfirm" "info" "config:" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "deps" "list" "refresh" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed" "unrequired" "downloadonly" "quiet")
+OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "h" "V" "d" "b:" "a" "y" "e" "s" "u" "i" "c" "q" "n" "k" "r:" "l" "t" "w" "q" "g")
+OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "dbpath:" "explicit" "aururl" "aur" "noconfirm" "info" "config:" "groups" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "deps" "list" "refresh" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed" "unrequired" "downloadonly" "quiet")
 GETOPT=(-o "$(printf "%s," "${OPTS[@]}")" -l "$(printf "%s," "${OPTL[@]}")" -- "${@}")
 readarray -t PARSED_ARGS < <(getopt "${GETOPT[@]}")
 RAW_ARGS=("${@}")
@@ -1073,6 +1082,14 @@ if [[ "${pass_to_pacman}" = false ]]; then
 			-l | --list)
 				pkg_list=true
 				add_args pacman "--list" "${2}"
+				shift 1
+				;;
+			-e | --explicit)
+				add_args pacman "--explicit"
+				shift 1
+				;;
+			-g | --groups)
+				option_g_count=$(( option_g_count + 1 ))
 				shift 1
 				;;
 			-t | --unrequired)
