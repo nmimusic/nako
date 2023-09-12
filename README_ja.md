@@ -1,26 +1,23 @@
 # Nako
 -----
-<center>
 BashとPyalpmで書かれたPacmanラッパー機能のあるAURヘルパー
-</center>
 
-<center>
-    <a href="https://github.com/njb-fm/nako/blob/master/LICENSE">
-        <img src="https://img.shields.io/github/license/njb-fm/nako?style=flat-square">
-    </a>
-    <a href="https://github.com/njb-fm/nako/issues">
-        <img src="https://img.shields.io/github/issues/njb-fm/nako?style=flat-square">
-    </a>
-    <a href="https://aur.archlinux.org/packages/nako">
-        <img src="https://img.shields.io/aur/version/nako?style=flat-square">
-    </a>
-    <a href="https://github.com/njb-fm/nako">
-        <img src="https://img.shields.io/github/last-commit/njb-fm/nako?style=flat-square">
-    </a>
-    <a href="https://github.com/njb-fm/nako">
-        <img src="https://img.shields.io/github/stars/njb-fm/nako?style=flat-square">
-    </a>
-</center>
+<a href="https://github.com/njb-fm/nako/blob/master/LICENSE">
+    <img src="https://img.shields.io/github/license/njb-fm/nako?style=flat-square">
+</a>
+<a href="https://github.com/njb-fm/nako/issues">
+    <img src="https://img.shields.io/github/issues/njb-fm/nako?style=flat-square">
+</a>
+<a href="https://aur.archlinux.org/packages/nako">
+    <img src="https://img.shields.io/aur/version/nako?style=flat-square">
+</a>
+<a href="https://github.com/njb-fm/nako">
+    <img src="https://img.shields.io/github/last-commit/njb-fm/nako?style=flat-square">
+</a>
+<a href="https://github.com/njb-fm/nako">
+    <img src="https://img.shields.io/github/stars/njb-fm/nako?style=flat-square">
+</a>
+
 
 [English version is here](README.md)
 
