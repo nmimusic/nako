@@ -95,7 +95,8 @@ msg_common(){
 	[[ "${1}" = "-n" ]] && _msg_opts+=("-n") && shift 1
 	_message="$(text "${@}")"
 	for _count in $(seq "1" "$(echo -ne "${_message}\n" | wc -l)"); do
-		echo "${_msg_opts[@]}" "$(text -nc cyan "[nako]") ${_label} $(echo -e "${_message}" | head -n "${_count}" | tail -n 1 )"
+#		echo "${_msg_opts[@]}" "$(text -nc cyan "[nako]") ${_label} $(echo -e "${_message}" | head -n "${_count}" | tail -n 1 )"
+		echo "${_msg_opts[@]}" "$(text -nc cyan "[nako]") ${_label} $(printf "${_message}" | head -n "${_count}" | tail -n 1 )"
 	done
 	[[ "${bash_debug}" = true  ]] && set -xv
 	[[ "${bash_debug}" = false ]] && set +xv
@@ -349,13 +350,13 @@ add_args() {
 		"curl") curl_args=("${@}")
 			;;
 		*)
-			msg_error "Failed to set the argument of %s" "${_target}"
+			msg_error "Failed to set the argument of ${_target}"
 			msg_error "Setting that command is not currently supported"
 			exit 1
 			;;
 	esac
 
-	msg_debug "%s ARGS: %s" "${_target}" "${*}"
+	msg_debug "${_target} ARGS: ${*}"
 }
 
 # Return 0 if the package specified by the argument is an AUR package
