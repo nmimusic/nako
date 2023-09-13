@@ -181,7 +181,7 @@ usage (){
 		echo "    ${nako_cmd} {-A --vote}"
 		echo "    ${nako_cmd} {-N --nako}"
 		#echo "    ${nako_cmd} {-P --show}        [options]"
-		#echo "    ${nako_cmd} {-G --getpkgbuild} [package(s)]"
+		echo "    ${nako_cmd} {-G --getpkgbuild} [package(s)]"
 		echo
 		echo "New options:"
 		echo "       --repo             Assume targets are from the repositories"
@@ -418,7 +418,6 @@ get_aur_json() {
 	fi
 }
 
-
 # Build and install packages from AUR
 install_aur_pkg() {
 	local _pkg="${1}" _found_pkgs _aur_json _aur_snapshot_url _aur_version _aur_pkgbase
@@ -635,7 +634,7 @@ install_aur_pkg() {
 		for _pkgfile in "${_pkgfilelist[@]}"; do
 			printf "%s\n" "${_installed[@]}" | grep -qx "${_pkgfile}" && continue
 			[[ ! -f "${_pkgfile}" ]] && continue
-			run_pacman "${pacman_args[@]}" -U --noconfirm "${_pkgfile}" && _installed+=("${_pkgfile}")
+			run_pacman "${pacman_args[@]}" -U "${_pkgfile}" && _installed+=("${_pkgfile}")
 		done
 	fi
 
@@ -827,6 +826,29 @@ upgrade_aur_pkg() {
 	exit 0
 }
 
+get_pkg_json(){
+	local _pkg_json _resultcount
+	local _pkg="${1}"
+	_pkg_json=$("${curl_cmd}" "${curl_args[@]}" -sL "https://archlinux.org/packages/search/json/?q=${_pkg}" | jq -r)
+	_resultcount="$(echo "${_pkg_json}" | jq -r ".resultcount")"
+	echo "${_pkg_json}" | jq -r ".results[]"
+}
+
+operation_getpkgbuild(){
+	local _pkg _pkg_json
+
+	for _pkg in "${specified_pkgs[@]}"; do
+	_pkg_json="$(get_pkg_json "${_pkg}")"
+		if [[ -z "${_pkg_json}" ]]; then
+			msg_error "Not found this package in ABS: %s" "${_pkg}"
+			exit 1
+		else
+			"${git_cmd}" clone --quiet "${abs_url}"/"${_pkg}".git "${_pkg}"
+			msg_info "Downloaded PKGBUILD from ABS: %s" "${_pkg}"
+		fi
+	done
+}
+
 operation_sync(){
 	local _pkg
 
@@ -976,8 +998,8 @@ run_operation() {
 }
 
 # Parse options
-OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "h" "V" "d" "b:" "a" "y" "e" "s" "u" "i" "c" "q" "n" "k" "r:" "l" "t" "w" "q" "g")
-OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "dbpath:" "explicit" "aururl" "aur" "noconfirm" "info" "config:" "groups" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "deps" "list" "refresh" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed" "unrequired" "downloadonly" "quiet")
+OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "G" "h" "V" "d" "b:" "a" "y" "e" "s" "u" "i" "c" "q" "n" "k" "r:" "l" "t" "w" "q" "g")
+OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "dbpath:" "getpkgbuild" "explicit" "aururl" "aur" "noconfirm" "info" "config:" "groups" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "deps" "list" "refresh" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed" "unrequired" "downloadonly" "quiet")
 GETOPT=(-o "$(printf "%s," "${OPTS[@]}")" -l "$(printf "%s," "${OPTL[@]}")" -- "${@}")
 readarray -t PARSED_ARGS < <(getopt "${GETOPT[@]}")
 RAW_ARGS=("${@}")
@@ -1035,6 +1057,11 @@ while true; do
 			;;
 		-N | --nako)
 			set_operation "nako"
+			pass_to_pacman=false
+			shift 1
+			;;
+		-G | --getpkgbuild)
+			set_operation "getpkgbuild"
 			pass_to_pacman=false
 			shift 1
 			;;
@@ -1401,7 +1428,7 @@ fi
 
 # Execute the operation set by "set_operation"
 case "${operation}" in
-	"version" | "sync" | "query" | "remove" | "vote" | "nako")
+	"version" | "sync" | "query" | "remove" | "vote" | "nako" | "getpkgbuild")
 		run_operation "${operation}"
 		;;
 	"database" | "deptest" | "upgrade" | "files")
