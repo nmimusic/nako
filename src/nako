@@ -854,7 +854,7 @@ operation_sync(){
 		for _pkg in "${specified_pkgs[@]}"; do
 			search_aur_pkg "${_pkg}"
 		done
-		"${pacman_cmd}" -S "${pacman_args[@]}" "${specified_pkgs[@]}" || true
+		"${pacman_cmd}" -Ss "${pacman_args[@]}" "${specified_pkgs[@]}"
 	elif [[ "${pkg_list}" = "true" ]]; then
 		"${pacman_cmd}" -Sl "${pacman_args[@]}" "${specified_pkgs[@]}"
 	elif (( "${option_i_count}" >= 1 )); then
@@ -1246,7 +1246,8 @@ if [[ "${pass_to_pacman}" = false ]]; then
 				shift 1
 				;;
 			--search)
-				_search=true
+				pkg_search=true
+				add_args pacman "--search"
 				shift 1
 				;;
 			--sysupgrade)
