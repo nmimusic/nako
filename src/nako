@@ -704,20 +704,16 @@ search_aur_pkg() {
 				__installed=true
 			fi
 
-			if [[ "${quiet}" = true ]]; then
-				__output_text+="${found_pkg}"
-			else
-				__output_text+=(
-					"$(text -n -c blue -b "aur")/$(text -n -b "${_found_pkg}") $(text -n -c cyan "${__pkgver}") (+$(text -n -b "${__vote} ${__popularity}"))"
-				)
+			__output_text+=(
+				"$(text -n -c blue -b "aur")/$(text -n -b "${_found_pkg}") $(text -n -c cyan "${__pkgver}") (+$(text -n -b "${__vote} ${__popularity}"))"
+			)
 			
-				if [[ "${__orphaned}" = true ]]; then
-					__output_text+=("$(text -bc red "(Orphaned)")")
-				fi
+			if [[ "${__orphaned}" = true ]]; then
+				__output_text+=("$(text -bc red "(Orphaned)")")
+			fi
 
-				if [[ "${__installed}" = true ]]; then
-					__output_text+=("$(text -bc cyan "[Installed]")")
-				fi
+			if [[ "${__installed}" = true ]]; then
+				__output_text+=("$(text -bc cyan "[Installed]")")
 			fi
 			echo "${__output_text[*]}"
 			echo "    ${__pkgdesc}"
