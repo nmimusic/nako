@@ -182,7 +182,7 @@ usage (){
 		echo "new operations:"
 		echo "    ${nako_cmd} {-A --vote}"
 		echo "    ${nako_cmd} {-N --nako}"
-		#echo "    ${nako_cmd} {-P --show}        [options]"
+		echo "    ${nako_cmd} {-P --show}        [options]"
 		echo "    ${nako_cmd} {-G --getpkgbuild} [package(s)]"
 		echo
 		echo "New options:"
