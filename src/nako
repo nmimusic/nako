@@ -82,6 +82,7 @@ pass_to_pacman=false
 needed=false
 quiet=false
 downloadonly=false
+system_info=false
 cleanbuild=none
 redownload=none
 
@@ -168,7 +169,6 @@ usage (){
 		echo
 		echo "operations:"
 		echo "    ${nako_cmd} {-h --help}"
-		echo "    ${nako_cmd} {-A --vote}"
 		echo "    ${nako_cmd} {-V --version}"
 		echo "    ${nako_cmd} {-D --database}    <options> <package(s)>"
 		echo "    ${nako_cmd} {-F --files}       [options] [package(s)]"
@@ -181,7 +181,7 @@ usage (){
 		echo "new operations:"
 		echo "    ${nako_cmd} {-A --vote}"
 		echo "    ${nako_cmd} {-N --nako}"
-		#echo "    ${nako_cmd} {-P --show}        [options]"
+		echo "    ${nako_cmd} {-P --show}        [options]"
 		echo "    ${nako_cmd} {-G --getpkgbuild} [package(s)]"
 		echo
 		echo "New options:"
@@ -735,6 +735,23 @@ operation_version() {
 	echo
 }
 
+operation_show() {
+	local _installed_pkgs _explicitly_installed_pkgs
+	_installed_pkgs="$("${pacman_cmd}" -Q | wc -l)"
+	_foreign_installed_pkgs="$("${pacman_cmd}" -Qm | wc -l)"
+	_explicitly_installed_pkgs="$("${pacman_cmd}" -Qe | wc -l)"
+	if [[ "${system_info}" = true ]]; then
+		msg_info "Nako version %s" "${nako_version}"
+		msg_info "==========================================="
+		msg_info "Total installed packages: ${_installed_pkgs}"
+		msg_info "Foreign installed packages: ${_foreign_installed_pkgs}"
+		msg_info "Explicitly installed packages: ${_explicitly_installed_pkgs}"
+		msg_info "==========================================="	
+	else
+		:
+	fi
+}
+
 operation_remove() {
 	local _pkg _not_found=false
 	for _pkg in "${specified_pkgs[@]}"; do
@@ -999,8 +1016,8 @@ run_operation() {
 }
 
 # Parse options
-OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "G" "h" "V" "d" "b:" "a" "y" "e" "s" "u" "i" "c" "q" "n" "k" "r:" "l" "t" "w" "q" "g")
-OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "dbpath:" "getpkgbuild" "explicit" "aururl" "aur" "noconfirm" "info" "config:" "groups" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "deps" "list" "refresh" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed" "unrequired" "downloadonly" "quiet")
+OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "G" "h" "V" "P" "d" "b:" "a" "y" "e" "s" "u" "i" "c" "q" "n" "k" "r:" "l" "t" "w" "q" "g")
+OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "show" "dbpath:" "getpkgbuild" "explicit" "aururl" "aur" "noconfirm" "info" "config:" "groups" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "deps" "list" "refresh" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed" "unrequired" "downloadonly" "quiet")
 GETOPT=(-o "$(printf "%s," "${OPTS[@]}")" -l "$(printf "%s," "${OPTL[@]}")" -- "${@}")
 readarray -t PARSED_ARGS < <(getopt "${GETOPT[@]}")
 RAW_ARGS=("${@}")
@@ -1063,6 +1080,11 @@ while true; do
 			;;
 		-G | --getpkgbuild)
 			set_operation "getpkgbuild"
+			pass_to_pacman=false
+			shift 1
+			;;
+		-P | --show)
+			set_operation "show"
 			pass_to_pacman=false
 			shift 1
 			;;
@@ -1344,6 +1366,9 @@ if [[ "${pass_to_pacman}" = false ]]; then
 					"remove")
 						add_args pacman "--recursive"
 						;;
+					"show")
+						system_info=true
+						;;
 					*)
 						unavailable_in_this_operation
 						;;
@@ -1429,7 +1454,7 @@ fi
 
 # Execute the operation set by "set_operation"
 case "${operation}" in
-	"version" | "sync" | "query" | "remove" | "vote" | "nako" | "getpkgbuild")
+	"version" | "sync" | "query" | "remove" | "vote" | "nako" | "getpkgbuild" | "show")
 		run_operation "${operation}"
 		;;
 	"database" | "deptest" | "upgrade" | "files")
