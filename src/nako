@@ -28,7 +28,7 @@
 set -eu
 
 # Default Settings
-nako_version="0.8.1"
+nako_version="0.8"
 nako_name="Nako"
 nako_cmd="nako"
 nako_path="$(dirname $(realpath ${0}))/$(basename ${0})"
@@ -167,6 +167,7 @@ usage (){
 		echo
 		echo "operations:"
 		echo "    ${nako_cmd} {-h --help}"
+		echo "    ${nako_cmd} {-A --vote}"
 		echo "    ${nako_cmd} {-V --version}"
 		echo "    ${nako_cmd} {-D --database}    <options> <package(s)>"
 		echo "    ${nako_cmd} {-F --files}       [options] [package(s)]"
@@ -689,16 +690,20 @@ search_aur_pkg() {
 				__installed=true
 			fi
 
-			__output_text+=(
-				"$(text -n -c blue -b "aur")/$(text -n -b "${_found_pkg}") $(text -n -c cyan "${__pkgver}") (+$(text -n -b "${__vote} ${__popularity}"))"
-			)
+			if [[ "${quiet}" = true ]]; then
+				__output_text+="${found_pkg}"
+			else
+				__output_text+=(
+					"$(text -n -c blue -b "aur")/$(text -n -b "${_found_pkg}") $(text -n -c cyan "${__pkgver}") (+$(text -n -b "${__vote} ${__popularity}"))"
+				)
 			
-			if [[ "${__orphaned}" = true ]]; then
-				__output_text+=("$(text -bc red "(Orphaned)")")
-			fi
+				if [[ "${__orphaned}" = true ]]; then
+					__output_text+=("$(text -bc red "(Orphaned)")")
+				fi
 
-			if [[ "${__installed}" = true ]]; then
-				__output_text+=("$(text -bc cyan "[Installed]")")
+				if [[ "${__installed}" = true ]]; then
+					__output_text+=("$(text -bc cyan "[Installed]")")
+				fi
 			fi
 			echo "${__output_text[*]}"
 			echo "    ${__pkgdesc}"
@@ -849,9 +854,9 @@ operation_sync(){
 		for _pkg in "${specified_pkgs[@]}"; do
 			search_aur_pkg "${_pkg}"
 		done
-		"${pacman_cmd}" -S "${pacman_args[@]}" "${specified_pkgs[@]}" || true
+		"${pacman_cmd}" -Ss "${pacman_args[@]}" "${specified_pkgs[@]}"
 	elif [[ "${pkg_list}" = "true" ]]; then
-		"${pacman_cmd}" -S "${pacman_args[@]}" "${specified_pkgs[@]}"
+		"${pacman_cmd}" -Sl "${pacman_args[@]}" "${specified_pkgs[@]}"
 	elif (( "${option_i_count}" >= 1 )); then
 		if [[ "${specified_pkgs[@]}" == "" ]]; then
 			"${pacman_cmd}" -S "${pacman_args[@]}" "-$(yes "i" | head -n "${option_i_count}" | sed -z "s/\n//g")"
@@ -891,7 +896,7 @@ operation_query(){
 	if [[ "${pkg_search}" = true ]]; then
 		"${pacman_cmd}" -Q "${pacman_args[@]}" "${specified_pkgs[@]}"
 	elif [[ "${pkg_list}" = "true" ]]; then
-		"${pacman_cmd}" -Q "${pacman_args[@]}" "${specified_pkgs[@]}"
+		"${pacman_cmd}" -Ql "${pacman_args[@]}" "${specified_pkgs[@]}"
 	elif (( "${option_i_count}" >= 1 )); then
 		"${pacman_cmd}" -Q "${pacman_args[@]}" "-$(yes "i" | head -n "${option_i_count}" | sed -z "s/\n//g")" "${specified_pkgs[@]}"
 	elif (( "${option_g_count}" >= 1 )); then
@@ -1080,7 +1085,6 @@ if [[ "${pass_to_pacman}" = false ]]; then
 				;;
 			-l | --list)
 				pkg_list=true
-				add_args pacman "--list" "${2}"
 				shift 1
 				;;
 			-e | --explicit)
@@ -1242,7 +1246,8 @@ if [[ "${pass_to_pacman}" = false ]]; then
 				shift 1
 				;;
 			--search)
-				_search=true
+				pkg_search=true
+				add_args pacman "--search"
 				shift 1
 				;;
 			--sysupgrade)
