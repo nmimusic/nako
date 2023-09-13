@@ -38,6 +38,7 @@ makepkg -si
 # Dependencies
 * sudo
 * pacman
+* git
 * jq
 * python3 (or all later version)
 * curl

@@ -40,6 +40,7 @@ makepkg -si
 * sudo
 * pacman
 * jq
+* git
 * python3 (もしくはそれ以降の全ての版)
 * curl
 * pyalpm
