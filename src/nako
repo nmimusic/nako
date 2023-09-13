@@ -28,7 +28,7 @@
 set -eu
 
 # Default Settings
-nako_version="0.8.2"
+nako_version="0.8.1.1"
 nako_name="Nako"
 nako_cmd="nako"
 nako_path="$(dirname $(realpath ${0}))/$(basename ${0})"
@@ -80,6 +80,7 @@ pkg_list=false
 sync_upgrade=false
 pass_to_pacman=false
 needed=false
+print_performing=false
 quiet=false
 downloadonly=false
 system_info=false
@@ -216,7 +217,9 @@ usage (){
 		echo "  -g, --groups         view all members of a package group"
 		echo "                       (-gg to view all groups and members)"
 		echo "  -i, --info           view package information (-ii for extended information)"
+		echo "  -p, --print          print the targets instead of performing the operation"
 		echo "  -q, --quiet          show less information for query and search"
+		echo "  -r, --root <path>    set an alternate installation root"
 		echo "  -s, --search <regex> search remote repositories for matching strings"
 		echo "  -u, --sysupgrade     upgrade installed packages (-uu enables downgrades)"
 		echo "  -w, --downloadonly   download packages but do not install/upgrade anything"
@@ -247,8 +250,11 @@ usage (){
 		echo "  -e, --explicit       list packages explicitly installed [filter]"
 		echo "  -g, --groups         view all members of a package group"
 		echo "  -i, --info           view package information (-ii for extended information)"
-		echo "  -s, --search <regex> search locally-installed packages for matching strings"
+		echo "  -m, --foreign        list installed packages not found in sync db(s) [filter]"
+		echo "  -n, --native         list installed packages only found in sync db(s) [filter]"
+		echo "  -p, --file <package> query a package file instead of the database"
 		echo "  -q, --quiet          show less information for query and search"
+		echo "  -s, --search <regex> search locally-installed packages for matching strings"
 		echo "  -t, --unrequired     list packages not (optionally) required by any"
 		echo "                       package (-tt to ignore optdepends) [filter]"
 		echo "  -u, --upgrades       list outdated packages [filter]"
@@ -272,6 +278,11 @@ usage (){
 		echo "options:"
 		echo "  -b, --dbpath <path>  set an alternate database location"
 		echo "  -d, --nodeps         skip dependency version checks (-dd to skip all checks)"
+		echo "  -n, --nosave         remove configuration files"
+		echo "  -p, --print          print the targets instead of performing the operation"
+		echo "  -r, --root <path>    set an alternate installation root"
+		echo "  -s, --recursive      remove unnecessary dependencies"
+		echo "                       (-ss includes explicitly installed dependencies)"
 		echo "  -u, --unneeded       remove unneeded packages"
 		echo "      --arch <arch>    set an alternate architecture"
 		echo "      --color <when>   colorize the output"
@@ -280,6 +291,9 @@ usage (){
 		echo "      --debug          display debug messages"
 		echo "      --disable-download-timeout"
 		echo "                       use relaxed timeouts for download"
+		echo "      --gpgdir <path>  set an alternate home directory for GnuPG"
+		echo "      --hookdir <dir>  set an alternate hook location"
+		echo "      --logfile <path> set an alternate log file"
 		echo "      --noconfirm      do not ask for any confirmation"
 	}
 
@@ -763,7 +777,11 @@ operation_remove() {
 	if [[ "${_not_found}" = true ]]; then
 		exit 1
 	else
+		if [[ "${print_performing}" = true ]]; then
+			"${pacman_cmd}" -Rp "${pacman_args[@]}" "${sprcified_pkgs[@]}"
+		else
 		run_pacman -R "${pacman_args[@]}" "${specified_pkgs[@]}"
+		fi
 	fi
 }
 
@@ -895,8 +913,10 @@ operation_sync(){
 			search_aur_pkg "${_pkg}"
 		done
 		"${pacman_cmd}" -Ss "${pacman_args[@]}" "${specified_pkgs[@]}"
-	elif [[ "${pkg_list}" = "true" ]]; then
+	elif [[ "${pkg_list}" = true ]]; then
 		"${pacman_cmd}" -Sl "${pacman_args[@]}" "${specified_pkgs[@]}"
+	elif [[ "${print_performing}" = true ]]; then
+		"${pacman_cmd}" -Sp "${pacman_args[@]}" "${specified_pkgs[@]}"
 	elif (( "${option_i_count}" >= 1 )); then
 		if [[ "${specified_pkgs[@]}" == "" ]]; then
 			"${pacman_cmd}" -S "${pacman_args[@]}" "-$(yes "i" | head -n "${option_i_count}" | sed -z "s/\n//g")"
@@ -1016,8 +1036,8 @@ run_operation() {
 }
 
 # Parse options
-OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "G" "h" "V" "P" "d" "b:" "a" "y" "e" "s" "u" "i" "c" "q" "n" "k" "r:" "l" "t" "w" "q" "g")
-OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "show" "dbpath:" "getpkgbuild" "explicit" "aururl" "aur" "noconfirm" "info" "config:" "groups" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "deps" "list" "refresh" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed" "unrequired" "downloadonly" "quiet")
+OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "G" "h" "V" "P" "d" "b:" "a" "y" "e" "s" "u" "i" "c" "q" "n" "k" "r:" "l" "t" "w" "p" "q" "m" "g")
+OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "show" "dbpath:" "getpkgbuild" "explicit" "aururl" "aur" "noconfirm" "info" "config:" "groups" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "deps" "list" "refresh" "print" "file" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed" "unrequired" "downloadonly" "foreign" "quiet")
 GETOPT=(-o "$(printf "%s," "${OPTS[@]}")" -l "$(printf "%s," "${OPTL[@]}")" -- "${@}")
 readarray -t PARSED_ARGS < <(getopt "${GETOPT[@]}")
 RAW_ARGS=("${@}")
@@ -1154,6 +1174,10 @@ if [[ "${pass_to_pacman}" = false ]]; then
 				downloadonly=true
 				shift 1
 				;;
+			-m | --foreign)
+				add_args pacman "--foreign"
+				shift 1
+				;;
 			-q | --quiet)
 				add_args pacman "--quiet"
 				quiet=true
@@ -1231,6 +1255,10 @@ if [[ "${pass_to_pacman}" = false ]]; then
 				add_args pacman "--debug"
 				shift 1
 				;;
+			--file)
+				add_args pacman "--file"
+				shift 1
+				;;
 			--gpgdir)
 				add_args pacman "--gpgdir ${2}"
 				shift 2
@@ -1290,6 +1318,11 @@ if [[ "${pass_to_pacman}" = false ]]; then
 			--pacman)
 				pacman_cmd="${2}"
 				shift 2
+				;;
+			--print)
+				print_performing=true
+				#add_args pacman "--print"
+				shift 1
 				;;
 			--recursive)
 				add_args pacman "--recursive"
@@ -1414,14 +1447,30 @@ if [[ "${pass_to_pacman}" = false ]]; then
 					"query")
 						add_args pacman "--deps"
 						;;
-					*)
+					"sync" | "remove")
 						add_args pacman "--nodeps"
 						nodeps=true
+						;;
+					*)
+						unavailable_in_this_operation
 						;;
 				esac
 				shift 1
 				;;
-
+			-p)
+				case "${operation}" in
+					"query")
+						add_args pacman "--file"
+						;;
+					"sync" | "remove")
+						add_args pacman "--print"
+						;;
+					*)
+						unavailable_in_this_operation
+						;;
+				esac
+				shift 1
+				;;
 			#-- for getopt --#
 			--)
 				shift 1
