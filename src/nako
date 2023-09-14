@@ -83,7 +83,7 @@ needed=false
 print_performing=false
 quiet=false
 downloadonly=false
-system_info=false
+system_stats=false
 cleanbuild=none
 redownload=none
 
@@ -201,6 +201,9 @@ usage (){
 		echo "    --config      <file>  pacman.conf file to use"
 		echo "    --makepkgconf <file>  makepkg.conf file to use"
 		echo "    --nomakepkgconf       Use the default makepkg.conf"
+		echo
+		echo "show specific options:"
+		echo "    -s --stats            Display system package statistics"
 		echo
 		echo "nako specific options:"
 		echo "    -c --clean            Remove unneeded dependencies"
@@ -750,7 +753,7 @@ operation_show() {
 	_installed_pkgs="$("${pacman_cmd}" -Q | wc -l)"
 	_foreign_installed_pkgs="$("${pacman_cmd}" -Qm | wc -l)"
 	_explicitly_installed_pkgs="$("${pacman_cmd}" -Qe | wc -l)"
-	if [[ "${system_info}" = true ]]; then
+	if [[ "${system_stats}" = true ]]; then
 		msg_info "Nako version %s" "${nako_version}"
 		msg_info "==========================================="
 		msg_info "Total installed packages: ${_installed_pkgs}"
@@ -1033,7 +1036,7 @@ run_operation() {
 
 # Parse options
 OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "G" "h" "V" "P" "d" "b:" "a" "y" "e" "s" "u" "i" "c" "q" "n" "k" "r:" "l" "t" "w" "p" "q" "m" "g")
-OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "show" "dbpath:" "getpkgbuild" "explicit" "aururl" "aur" "noconfirm" "info" "config:" "groups" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "deps" "list" "refresh" "print" "file" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed" "unrequired" "downloadonly" "foreign" "quiet")
+OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "show" "dbpath:" "getpkgbuild" "explicit" "aururl" "aur" "noconfirm" "info" "config:" "groups" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "deps" "list" "refresh" "print" "file" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed" "unrequired" "downloadonly" "foreign" "quiet" "stats")
 GETOPT=(-o "$(printf "%s," "${OPTS[@]}")" -l "$(printf "%s," "${OPTL[@]}")" -- "${@}")
 readarray -t PARSED_ARGS < <(getopt "${GETOPT[@]}")
 RAW_ARGS=("${@}")
@@ -1341,6 +1344,10 @@ if [[ "${pass_to_pacman}" = false ]]; then
 				debug=true
 				shift 1
 				;;
+			--stats)
+				system_stats=true
+				shift 1
+				;;
 
 			# Other long options
 			--color)
@@ -1396,7 +1403,7 @@ if [[ "${pass_to_pacman}" = false ]]; then
 						add_args pacman "--recursive"
 						;;
 					"show")
-						system_info=true
+						system_stats=true
 						;;
 					*)
 						unavailable_in_this_operation
