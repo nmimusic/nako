@@ -54,6 +54,9 @@ sudo_args=()
 curl_cmd="/usr/bin/curl"
 curl_args=()
 
+auracle_cmd="/usr/bin/auracle"
+auracle_args=()
+
 # str options
 arch=
 aur_url="https://aur.archlinux.org/"
@@ -357,6 +360,9 @@ add_args() {
 			;;
 		"git")
 			git_args=("${@}")
+			;;
+		"auracle")
+			auracle_args=("${@}")
 			;;
 		"gpg")
 			gpg_args=("${@}")
@@ -662,69 +668,6 @@ install_aur_pkg() {
 	fi
 }
 
-# Search AUR packages
-search_aur_pkg() {
-	local _pkg="${1}" _aur_json
-	_aur_json="$(get_aur_json "${_pkg}")"
-	if [[ -z "${_aur_json}" ]]; then
-		msg_error "Could not find all required packages: %s" "${_pkg}"
-		exit 1
-	fi
-	#local _found_pkgname=($(echo "${_aur_json}" | jq -r ".Name" ))
-	readarray -t _found_pkgname < <(jq -r ".Name" <<< "${_aur_json}")
-
-	if [[ "${quiet}" = true ]]; then
-		local _IFS="${IFS}"
-		IFS=$'\n'
-		echo "${_found_pkgname[*]}"
-		IFS="${_IFS}"
-	else
-		local  _found_pkg __pkgver __popularity __vote __pkgdesc __orphaned __installed __output_text=()
-		for _found_pkg in "${_found_pkgname[@]}"; do
-			__orphaned=false
-			__installed=false
-			_found_json="$(echo "${_aur_json}" | jq "select(.Name == \"${_found_pkg}\")")"
-
-			#echo "${_found_json}"
-			__pkgver="$(echo "${_found_json}" | jq -r ".Version" )"
-			__popularity="$(echo "${_found_json}" | jq -r ".Popularity" )"
-			__vote="$(echo "${_found_json}" | jq -r ".NumVotes" )"
-			__pkgdesc="$(echo "${_found_json}" | jq -r ".Description" )"
-
-			# Rounded to two decimal places of popularity
-			# cf: http://www.rivhiro-weather.com/knowledge/?p=536
-			msg_debug "Raw popularity: %s" "${__popularity}"
-			__popularity="$(printf "%g\n" "${__popularity}" | awk '{printf("%4.2f", $1)}')"
-
-			# Determine that the package is orphaned
-			# cf: https://www.366service.com/jp/qa/7c95f46e5236039134ff5b862ae2cd13
-			if ! echo "${_found_json}" | jq -r --exit-status ".Maintainer" 1> /dev/null 2> /dev/null ; then
-				__orphaned=true
-			fi
-
-			# Determine that the package is Installed
-			if check_installed_pkg "${_found_pkg}"; then
-				__installed=true
-			fi
-
-			__output_text+=(
-				"$(text -n -c blue -b "aur")/$(text -n -b "${_found_pkg}") $(text -n -c cyan "${__pkgver}") (+$(text -n -b "${__vote} ${__popularity}"))"
-			)
-			
-			if [[ "${__orphaned}" = true ]]; then
-				__output_text+=("$(text -bc red "(Orphaned)")")
-			fi
-
-			if [[ "${__installed}" = true ]]; then
-				__output_text+=("$(text -bc cyan "[Installed]")")
-			fi
-			echo "${__output_text[*]}"
-			echo "    ${__pkgdesc}"
-			unset __pkgver __popularity __vote __pkgdesc _found_json __orphaned __installed __output_text
-		done
-	fi
-}
-
 # Show the version
 operation_version() {
 	local _libalpm_version _pacman_version
@@ -735,10 +678,15 @@ operation_version() {
 	# Get Pacman's version from Pacman
 	_pacman_version="$("${pacman_cmd}" -Q pacman | cut -d ' ' -f 2)"
 
+	# Get Auracle version from Auracle
+	_auracle_version="$("${auracle_cmd}" --version | sed "s/auracle //g")"
+
 	echo
-	echo "Nako ${nako_version} - Pacman ${_pacman_version} - libalpm ${_libalpm_version}"
+	echo "Nako ${nako_version}"
+	echo "(Pacman ${_pacman_version} - libalpm ${_libalpm_version} - auracle ${_auracle_version})"
 	echo
-	echo "Nako is a AUR Helper and Pacman wrapper written in Bash and Pyalpm."
+	echo "Nako is a AUR Helper and Pacman wrapper"
+	echo "written in Bash, Auracle and Pyalpm."
 	echo
 	echo "Copyright (C) 2023 Radio New Japan"
 	echo "Copyright (C) 2023 Hayate NAKA-MURA (a.k.a. Jin ASA-NAMI)"
@@ -908,9 +856,7 @@ operation_sync(){
 	fi
 
 	if [[ "${pkg_search}" = true ]]; then
-		for _pkg in "${specified_pkgs[@]}"; do
-			search_aur_pkg "${_pkg}"
-		done
+		"${auracle_cmd}" search "${auracle_args[@]}" "${specified_pkgs[@]}"
 		"${pacman_cmd}" -Ss "${pacman_args[@]}" "${specified_pkgs[@]}"
 	elif [[ "${pkg_list}" = true ]]; then
 		"${pacman_cmd}" -Sl "${pacman_args[@]}" "${specified_pkgs[@]}"
@@ -924,7 +870,7 @@ operation_sync(){
 				if check_repo_pkg "${_pkg}" && [[ "${force_aur}" = false ]]; then
 					"${pacman_cmd}" -S "${pacman_args[@]}" "-$(yes "i" | head -n "${option_i_count}" | sed -z "s/\n//g")" "${specified_pkgs[@]}"
 				else
-					msg_info "Showing the AUR package info has not been implemented yet."
+					"${auracle_cmd}" info "${auracle_args[@]}" "${specified_pkgs[@]}"
 				fi
 			done
 		fi
@@ -943,11 +889,11 @@ operation_sync(){
 				# Install AUR package first
 				install_aur_pkg "${_pkg}"
 			fi
-			# Install binary package after
-			if [[ -f ${nako_cache_dir}/repopkgs.txt ]]; then
-				run_pacman -S "${pacman_args[@]}" $(cat $(get_cache_dir)/nako/repopkgs.txt)
-			fi
-			done
+		done
+		# Install binary package after
+		if [[ -f ${nako_cache_dir}/repopkgs.txt ]]; then
+			run_pacman -S "${pacman_args[@]}" $(cat $(get_cache_dir)/nako/repopkgs.txt)
+		fi
 	fi
 }
 
