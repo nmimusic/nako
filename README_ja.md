@@ -1,6 +1,6 @@
 # Nako
 -----
-BashとPyalpmで書かれたPacman/Auracleラッパー機能のあるAURヘルパー
+BashとPyalpmで書かれたPacmanラッパー機能のあるAURヘルパー
 
 <a href="https://github.com/njb-fm/nako/blob/master/LICENSE">
     <img src="https://img.shields.io/github/license/njb-fm/nako?style=flat-square">
@@ -31,10 +31,6 @@ NakoがBashで書かれたAURヘルパーに生まれ変わった。名称は音
 # 導入しよう
 AURから入れられるよ。
 ```bash
-git clone https://aur.archlinux.org/auracle ./auracle
-cd auracle
-makepkg -si
-
 git clone https://aur.archlinux.org/nako ./nako
 cd nako
 makepkg -si
@@ -44,7 +40,6 @@ makepkg -si
 * sudo
 * pacman
 * jq
-* auracle
 * git
 * python3 (もしくはそれ以降の全ての版)
 * curl

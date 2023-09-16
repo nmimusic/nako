@@ -1,6 +1,6 @@
 # Nako
 -----
-An AUR helper with Pacman/Auracle wrapper, written in Bash and Pyalpm
+An AUR helper with Pacman wrapper, written in Bash and Pyalpm
 
 <a href="https://github.com/njb-fm/nako/blob/master/LICENSE">
     <img src="https://img.shields.io/github/license/njb-fm/nako?style=flat-square">
@@ -30,10 +30,6 @@ Nako has reborn as an AUR helper. The name comes from the character, Nako Akahir
 # How To Install
 Nako can be installed from AUR.
 ```bash
-git clone https://aur.archlinux.org/auracle ./auracle
-cd auracle
-makepkg -si
-
 git clone https://aur.archlinux.org/nako ./nako
 cd nako
 makepkg -si
@@ -44,7 +40,6 @@ makepkg -si
 * pacman
 * git
 * jq
-* auracle
 * python3 (or all later version)
 * curl
 * pyalpm
