@@ -30,6 +30,10 @@ Nako has reborn as an AUR helper. The name comes from the character, Nako Akahir
 # How To Install
 Nako can be installed from AUR.
 ```bash
+git clone https://aur.archlinux.org/auracle ./auracle
+cd auracle
+makepkg -si
+
 git clone https://aur.archlinux.org/nako ./nako
 cd nako
 makepkg -si
