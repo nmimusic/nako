@@ -943,11 +943,11 @@ operation_sync(){
 				# Install AUR package first
 				install_aur_pkg "${_pkg}"
 			fi
-			# Install binary package after
-			if [[ -f ${nako_cache_dir}/repopkgs.txt ]]; then
-				run_pacman -S "${pacman_args[@]}" $(cat $(get_cache_dir)/nako/repopkgs.txt)
-			fi
-			done
+		done
+		# Install binary package after
+		if [[ -f ${nako_cache_dir}/repopkgs.txt ]]; then
+			run_pacman -S "${pacman_args[@]}" $(cat $(get_cache_dir)/nako/repopkgs.txt)
+		fi
 	fi
 }
 
