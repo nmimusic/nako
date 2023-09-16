@@ -1,6 +1,6 @@
 # Nako
 -----
-An AUR helper with Pacman wrapper, written in Bash and Pyalpm
+An AUR helper with Pacman/Auracle wrapper, written in Bash and Pyalpm
 
 <a href="https://github.com/njb-fm/nako/blob/master/LICENSE">
     <img src="https://img.shields.io/github/license/njb-fm/nako?style=flat-square">
@@ -40,6 +40,7 @@ makepkg -si
 * pacman
 * git
 * jq
+* auracle
 * python3 (or all later version)
 * curl
 * pyalpm

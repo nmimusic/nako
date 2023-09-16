@@ -1,6 +1,6 @@
 # Nako
 -----
-BashとPyalpmで書かれたPacmanラッパー機能のあるAURヘルパー
+BashとPyalpmで書かれたPacman/Auracleラッパー機能のあるAURヘルパー
 
 <a href="https://github.com/njb-fm/nako/blob/master/LICENSE">
     <img src="https://img.shields.io/github/license/njb-fm/nako?style=flat-square">
@@ -40,6 +40,7 @@ makepkg -si
 * sudo
 * pacman
 * jq
+* auracle
 * git
 * python3 (もしくはそれ以降の全ての版)
 * curl
