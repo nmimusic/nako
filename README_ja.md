@@ -31,6 +31,10 @@ NakoがBashで書かれたAURヘルパーに生まれ変わった。名称は音
 # 導入しよう
 AURから入れられるよ。
 ```bash
+git clone https://aur.archlinux.org/auracle ./auracle
+cd auracle
+makepkg -si
+
 git clone https://aur.archlinux.org/nako ./nako
 cd nako
 makepkg -si
