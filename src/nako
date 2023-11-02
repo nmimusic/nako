@@ -28,14 +28,13 @@
 set -eu
 
 # Default Settings
-nako_version="0.8.2"
+nako_version="0.8.2.1"
 nako_name="Nako"
 nako_cmd="nako"
 nako_path="$(dirname $(realpath ${0}))/$(basename ${0})"
 
 # Executables
 pacman_cmd="/usr/bin/pacman"
-pacman_key_cmd="/usr/bin/pacman-key"
 pacman_cfg="/etc/pacman.conf"
 pacman_args=()
 
@@ -185,7 +184,6 @@ usage (){
 		echo "    ${nako_cmd} {-N --nako}"
 		echo "    ${nako_cmd} {-P --show}        [options]"
 		echo "    ${nako_cmd} {-G --getpkgbuild} [package(s)]"
-		echo "    ${nako_cmd} {-K --keyring}     [options] <keyid or keyfile>"
 		echo
 		echo "New options:"
 		echo "       --repo             Assume targets are from the repositories"
@@ -302,22 +300,6 @@ usage (){
 		echo "      --noconfirm      do not ask for any confirmation"
 	}
 
-	local _nako_usage_keyring
-	_nako_usage_keyring() {
-		echo "usage:  ${nako_cmd} {-K --keyring} [option(s)] <keyid or keyfile>"
-		echo "options:"
-		echo "  -a, --add <keyfile>"
-		echo "  -d, --delete <keyid>"
-		echo "  -f, --finger <keyid>"
-		echo "  -i, --init <keyid>"
-		echo "  -l, --list <keyid>"
-		echo "  -p, --populate"
-		echo "  -r, --recv <keyid>"
-		echo "  -s, --lsign <keyid>"
-		echo "      --config <path>"
-		echo "      --gpgdir"
-		echo "      --keyserver"
-	}
 
 	local _nako_usage_version
 	_nako_usage_version(){ _nako_usage; }
@@ -357,8 +339,6 @@ _pacman_conf(){ pacman-conf --config="${pacman_cfg}" "${@}"; }
 run_sudo() { (( UID == 0 )) || eval "sudo" "${@}"; return 0 && eval "${@}"; }
 
 run_pacman() { run_sudo "${pacman_cmd}" --config "${pacman_cfg}"  "${@}"; }
-
-run_pacman_key() { run_sudo "${pacman_key_cmd}" --config "${pacman_cfg}" "${@}"; }
 
 nako() { "${nako_path}" "${@}"; }
 
