@@ -1044,7 +1044,7 @@ operation_query(){
 }
 
 operation_nako() {
-	_no_need_packages="$(${pacman_cmd} -Qtdq)"
+	_no_need_packages="$(${pacman_cmd} -Qtdq | sed -z "s/\n/ /g")"
 	if [[ ${nako_operation} == "clean_all" ]]; then
 		if [[ ${_no_need_packages} == "" ]]; then
 			exit 0
