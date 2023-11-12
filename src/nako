@@ -28,7 +28,7 @@
 set -eu
 
 # Default Settings
-nako_version="0.9"
+nako_version="0.9.1"
 nako_name="Nako"
 nako_cmd="nako"
 nako_path="$(dirname $(realpath ${0}))/$(basename ${0})"
@@ -1114,7 +1114,7 @@ run_operation() {
 
 # Parse options
 OPTS=("A" "D" "F" "N" "Q" "R" "S" "T" "U" "G" "h" "V" "P" "d" "b:" "a" "y" "e" "s" "u" "i" "c" "q" "n" "k" "r:" "l" "t" "w" "p" "q" "m" "g")
-OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "show" "dbpath:" "getpkgbuild" "explicit" "aururl" "aur" "noconfirm" "info" "config:" "groups" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "deps" "list" "refresh" "print" "file" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed" "unrequired" "downloadonly" "foreign" "quiet" "stats")
+OPTL=("query" "remove" "sync" "help" "version" "debug" "nako" "show" "dbpath:" "getpkgbuild" "explicit" "aururl" "aur" "noconfirm" "info" "config:" "groups" "makepkg:" "mflags:" "pacman:" "git:" "gitflags:" "gpg:" "gpgflags:" "makepkgconf:" "nomakepkgconf" "nodeps" "deps" "list" "refresh" "print" "file" "bash-debug" "msg-debug" "search" "sysupgrade" "color:" "nocolor" "clean" "quiet" "arch:" "confirm" "disable-download-timeout" "curl:" "curlflags:" "unneeded" "native" "puella" "nako-debug" "cascade" "ignoregroup:" "ignore:" "hookdir:" "gpgdir:" "cachedir:" "check" "root:" "asdeps" "asexplicit" "needed" "unrequired" "downloadonly" "foreign" "quiet" "stats")
 GETOPT=(-o "$(printf "%s," "${OPTS[@]}")" -l "$(printf "%s," "${OPTL[@]}")" -- "${@}")
 readarray -t PARSED_ARGS < <(getopt "${GETOPT[@]}")
 RAW_ARGS=("${@}")
@@ -1220,10 +1220,6 @@ if [[ "${pass_to_pacman}" = false ]]; then
 				;;
 			-y | --refresh)
 				option_y_count=$(( option_y_count + 1 ))
-				shift 1
-				;;
-			-n | --nosave)
-				add_args pacman "--nosave"
 				shift 1
 				;;
 			-r | --root)
@@ -1372,6 +1368,10 @@ if [[ "${pass_to_pacman}" = false ]]; then
 				msgdebug=true
 				shift 1
 				;;
+			--native)
+				add_args pacman "--native"
+				shift 1
+				;;
 			--noconfirm)
 				add_args pacman "--noconfirm"
 				noconfirm=true
@@ -1385,6 +1385,10 @@ if [[ "${pass_to_pacman}" = false ]]; then
 			--nodeps)
 				add_args pacman "--nodeps"
 				nodeps=true
+				shift 1
+				;;
+			--nosave)
+				add_args pacman "--nosave"
 				shift 1
 				;;
 			--needed)
@@ -1531,6 +1535,20 @@ if [[ "${pass_to_pacman}" = false ]]; then
 					"sync" | "remove")
 						add_args pacman "--nodeps"
 						nodeps=true
+						;;
+					*)
+						unavailable_in_this_operation
+						;;
+				esac
+				shift 1
+				;;
+			-n)
+				case "${operation}" in
+					"query")
+						add_args pacman "--native"
+						;;
+					"remove")
+						add_args pacman "--nosave"
 						;;
 					*)
 						unavailable_in_this_operation
