@@ -28,7 +28,7 @@
 set -eu
 
 # Default Settings
-nako_version="0.9.1"
+nako_version="1.0"
 nako_name="Nako"
 nako_cmd="nako"
 nako_path="$(dirname $(realpath ${0}))/$(basename ${0})"
