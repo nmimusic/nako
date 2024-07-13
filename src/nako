@@ -29,7 +29,7 @@
 set -eu
 
 # Default Settings
-nako_version="1.0"
+nako_version="1.0.1"
 nako_name="Nako"
 nako_cmd="nako"
 nako_path="$(dirname $(realpath ${0}))/$(basename ${0})"
@@ -823,8 +823,8 @@ operation_version() {
 	echo
 	echo "Nako is a AUR Helper and Pacman wrapper written in Bash and Pyalpm."
 	echo
-	echo "Copyright (C) 2023 Radio New Japan"
-	echo "Copyright (C) 2023 Hayate NAKA-MURA (a.k.a. Jin ASA-NAMI)"
+	echo "Copyright (C) 2023-2024 Nakamura Musical Industries Dojin Club"
+	echo "Copyright (C) 2023-2024 Hayate Nakamura (a.k.a. Jin Asanami)"
 	echo
 	echo "This programme may be freely redistributed under"
 	echo "the terms of the 3-clause BSD License."

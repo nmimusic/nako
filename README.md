@@ -2,20 +2,20 @@
 -----
 An AUR helper with Pacman wrapper, written in Bash and Pyalpm
 
-<a href="https://github.com/njb-fm/nako/blob/master/LICENSE">
-    <img src="https://img.shields.io/github/license/njb-fm/nako?style=flat-square">
+<a href="https://github.com/nmimusic/nako/blob/master/LICENSE">
+    <img src="https://img.shields.io/github/license/nmimusic/nako?style=flat-square">
 </a>
-<a href="https://github.com/njb-fm/nako/issues">
-    <img src="https://img.shields.io/github/issues/njb-fm/nako?style=flat-square">
+<a href="https://github.com/nmimusic/nako/issues">
+    <img src="https://img.shields.io/github/issues/nmimusic/nako?style=flat-square">
 </a>
 <a href="https://aur.archlinux.org/packages/nako">
     <img src="https://img.shields.io/aur/version/nako?style=flat-square">
 </a>
-<a href="https://github.com/njb-fm/nako">
-    <img src="https://img.shields.io/github/last-commit/njb-fm/nako?style=flat-square">
+<a href="https://github.com/nmimusic/nako">
+    <img src="https://img.shields.io/github/last-commit/nmimusic/nako?style=flat-square">
 </a>
-<a href="https://github.com/njb-fm/nako">
-    <img src="https://img.shields.io/github/stars/njb-fm/nako?style=flat-square">
+<a href="https://github.com/nmimusic/nako">
+    <img src="https://img.shields.io/github/stars/nmimusic/nako?style=flat-square">
 </a>
 
 [日本語版はこちら](README_ja.md)
@@ -48,5 +48,5 @@ makepkg -si
 # License
 This software is licensed under [3-clause BSD License](LICENSE).
 
-(C) 2023 Radio New Japan.
+(C) 2023-2024 Nakamura Musical Industries Dojin Club.
 
