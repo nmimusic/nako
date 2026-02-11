@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Nako - Bash-based AUR Helper
-# Copyright (c) 2023-2025, Nakamura Musical Industries Dojin Club/NIPPON RURITANIA.
+# Copyright (c) 2023-2026, Nippon Ruritania Music Assembly
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -29,7 +29,7 @@
 set -eu
 
 # Default Settings
-nako_version="1.0.1"
+nako_version="1.0.2"
 nako_name="Nako"
 nako_cmd="nako"
 nako_path="$(dirname $(realpath ${0}))/$(basename ${0})"
@@ -823,8 +823,7 @@ operation_version() {
 	echo
 	echo "Nako is a AUR Helper and Pacman wrapper written in Bash and Pyalpm."
 	echo
-	echo "Copyright (C) 2023-2024 Nakamura Musical Industries Dojin Club/NIPPON RURITANIA"
-	echo "Copyright (C) 2023-2025 Jin Asanami"
+	echo "Copyright (C) 2023-2026 Nippon Ruritania Music Assembly"
 	echo
 	echo "This programme may be freely redistributed under"
 	echo "the terms of the 3-clause BSD License."
