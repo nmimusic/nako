@@ -48,5 +48,5 @@ makepkg -si
 # License
 This software is licensed under [3-clause BSD License](LICENSE).
 
-(C) 2023-2025 Nakamura Musical Industries Dojin Club/NIPPON RURITANIA.
+(C) 2023-2026 Nippon Ruritania Music Assembly.
 

@@ -47,7 +47,6 @@ makepkg -si
 * python-srcinfo
 
 # License
-このソフトウェアは[三条項BSDライセンス](LICENSE)の下で配布しています。[NJBによる非公式の和訳](LICENSE_ja)も見てね。
+このソフトウェアは[三条項BSDライセンス](LICENSE)の下で配布しています。[RURITANIAによる非公式の和訳](LICENSE_ja)も見てね。
 
-(C) 2023-2025 中村音楽工業。
-
+(C) 2023-2026 中村音楽工業。
